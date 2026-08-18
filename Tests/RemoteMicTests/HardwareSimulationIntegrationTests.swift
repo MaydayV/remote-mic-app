@@ -455,6 +455,87 @@ struct HardwareSimulationIntegrationTests {
         #expect(scheduler.pendingTaskCount == 0)
     }
 
+    @Test func HIDDiagnosticsTraceReportsEdgesGesturesAndActionsWithoutRawPayloads() throws {
+        let suiteName = "HardwareSimulationIntegrationTests.hidDiagnostics.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: defaults)
+        settings.customMappingEnabled = true
+        settings.setAction(.returnKey, for: .ok)
+        let profileID = try #require(settings.selectedRemoteProfileID)
+        var diagnostics: [String] = []
+        let monitor = HIDRemoteMonitor(
+            settings: settings,
+            profileID: profileID,
+            ownsEventSuppressor: false,
+            runtimePermissions: { true },
+            actionPerformer: { _, _, _ in true },
+            diagnosticLogger: { diagnostics.append($0) }
+        )
+        monitor.connectSimulatedDevice(fingerprint: "diagnostic", profileID: profileID)
+        monitor.handleSimulatedReport(
+            reportID: 1,
+            data: Data([0x28, 0, 0, 0, 0, 0])
+        )
+        monitor.handleSimulatedReport(
+            reportID: 1,
+            data: Data([0, 0, 0, 0, 0, 0])
+        )
+
+        #expect(diagnostics.contains { $0.contains("HID REPORT accepted source=simulated") })
+        #expect(diagnostics.contains { $0.contains("HID EDGE pressed=ok") })
+        #expect(diagnostics.contains { $0.contains("HID GESTURE button=ok") })
+        #expect(!diagnostics.contains { $0.contains("0x28") || $0.contains("diagnostic") })
+    }
+
+    @Test func privateMacroBindingCanOwnDisabledDoubleClickWithoutStoppingHID() throws {
+        let suiteName = "HardwareSimulationIntegrationTests.privateMacro.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: defaults)
+        settings.customMappingEnabled = true
+        settings.setAction(.disabled, for: .menu, trigger: .doubleClick)
+        let profileID = try #require(settings.selectedRemoteProfileID)
+        let scheduler = TestHIDRemoteScheduler()
+        var privateEvents: [(RemoteButton, ButtonTrigger)] = []
+        var publicActionCount = 0
+        let monitor = HIDRemoteMonitor(
+            settings: settings,
+            profileID: profileID,
+            ownsEventSuppressor: false,
+            scheduler: scheduler,
+            runtimePermissions: { true },
+            actionPerformer: { _, _, _ in
+                publicActionCount += 1
+                return true
+            },
+            overrideActionPerformer: { _, button, trigger in
+                privateEvents.append((button, trigger))
+                return true
+            },
+            hasOverrideBinding: { _, button, trigger in
+                button == .menu && trigger == .doubleClick
+            },
+            frontmostBundleIdentifier: { PresetApplication.codex.bundleIdentifier }
+        )
+        monitor.connectSimulatedDevice(fingerprint: "private-macro", profileID: profileID)
+        let report = XiaomiVoiceRemoteButton.menu.report
+        let release = Data(repeating: 0, count: report.data.count)
+
+        monitor.handleSimulatedReport(reportID: report.reportID, data: report.data)
+        monitor.handleSimulatedReport(reportID: report.reportID, data: release)
+        scheduler.advance(toMilliseconds: 100)
+        monitor.handleSimulatedReport(reportID: report.reportID, data: report.data)
+        monitor.handleSimulatedReport(reportID: report.reportID, data: release)
+        scheduler.advance(toMilliseconds: 700)
+
+        #expect(privateEvents.count == 1)
+        #expect(privateEvents.first?.0 == .menu)
+        #expect(privateEvents.first?.1 == .doubleClick)
+        #expect(publicActionCount == 0)
+        #expect(monitor.status != LocalizedMessage("button_mapping.permission.accessibility_expired"))
+    }
+
     @Test(arguments: XiaomiVoiceRemoteButton.allCases.filter { $0 != .back })
     func monitoredNativeButtonsReleaseSuppressionAfterReleaseAndDisconnect(
         _ simulatedButton: XiaomiVoiceRemoteButton
