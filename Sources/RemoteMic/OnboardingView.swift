@@ -325,6 +325,24 @@ struct OnboardingView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
 
+            // 开始前选择遥控器品牌（决定使用哪个后端；之后可在设置中随时切换）
+            VStack(alignment: .leading, spacing: 8) {
+                Text(localization.text("onboarding.remote.brand_title"))
+                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 12) {
+                    remoteBrandCard(
+                        kind: .xiaomi,
+                        imageName: "RC003-remote-photo",
+                        titleKey: "remote.backend.xiaomi_short"
+                    )
+                    remoteBrandCard(
+                        kind: .siriRemote,
+                        imageName: "SiriRemote-photo",
+                        titleKey: "remote.backend.siri_remote_short"
+                    )
+                }
+            }
+
             statusCard(
                 icon: model.isConnected ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right",
                 title: model.connectionStatus.text(using: localization),
@@ -353,6 +371,76 @@ struct OnboardingView: View {
                 openBluetoothSettingsButton
             }
         }
+    }
+
+    /// 遥控器品牌选择卡片：图片 + 名称 + 选中态
+    private func remoteBrandCard(
+        kind: RemoteBackendKind,
+        imageName: String,
+        titleKey: String
+    ) -> some View {
+        let isSelected = model.activeBackendKind == kind
+        return Button {
+            model.setActiveBackend(kind)
+        } label: {
+            VStack(spacing: 8) {
+                if let image = bundleImage(imageName) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 74)
+                        .padding(.vertical, 2)
+                } else {
+                    Image(systemName: "remote.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 74)
+                }
+                HStack(spacing: 5) {
+                    Text(localization.text(titleKey))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if kind == .siriRemote {
+                        Text(localization.text("remote.backend.siri_remote_generation"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.primary.opacity(0.08), in: Capsule())
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 132)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        isSelected ? Color.accentColor : Color.primary.opacity(0.12),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func bundleImage(_ name: String) -> NSImage? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png") else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
     }
 
     private var openBluetoothSettingsButton: some View {

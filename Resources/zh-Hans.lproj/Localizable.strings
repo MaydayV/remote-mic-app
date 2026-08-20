@@ -477,6 +477,10 @@
 "onboarding.permissions.accessibility.detail" = "执行快捷键及 Typeless 的 Fn 点按";
 "onboarding.remote.title" = "连接遥控器，再按一下实体键";
 "onboarding.remote.detail" = "请确保遥控器已在系统蓝牙设置中配对。连接后，按任意一个普通按键确认 Mac 能收到它。";
+"onboarding.remote.brand_title" = "选择你的遥控器";
+"remote.backend.siri_remote_short" = "Apple Siri Remote";
+"remote.backend.siri_remote_generation" = "第三代";
+"remote.backend.xiaomi_short" = "小米遥控器 2 Pro";
 "onboarding.remote.connected_detail" = "无线麦已与遥控器建立可用连接。";
 "onboarding.remote.searching_detail" = "保持遥控器靠近 Mac，并按键唤醒它。";
 "onboarding.remote.button_waiting" = "等待实体按键";

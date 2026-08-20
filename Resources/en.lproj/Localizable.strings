@@ -477,6 +477,10 @@
 "onboarding.permissions.accessibility.detail" = "Run shortcuts and the Typeless Fn tap";
 "onboarding.remote.title" = "Connect the remote, then press a physical button";
 "onboarding.remote.detail" = "Make sure the remote is paired in Bluetooth Settings. Once connected, press any normal button to confirm your Mac receives it.";
+"onboarding.remote.brand_title" = "Choose your remote";
+"remote.backend.siri_remote_short" = "Apple Siri Remote";
+"remote.backend.siri_remote_generation" = "3rd gen";
+"remote.backend.xiaomi_short" = "Xiaomi Remote 2 Pro";
 "onboarding.remote.connected_detail" = "Remote Mic has a working connection to the remote.";
 "onboarding.remote.searching_detail" = "Keep the remote near your Mac and press a button to wake it.";
 "onboarding.remote.button_waiting" = "Waiting for a physical button";

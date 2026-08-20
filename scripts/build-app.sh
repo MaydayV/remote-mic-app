@@ -168,6 +168,9 @@ ditto --norsrc --noextattr --noqtn --noacl \
 ditto --norsrc --noextattr --noqtn --noacl \
   "$ROOT/Resources/RC003-remote-photo.png" \
   "$APP_DIR/Contents/Resources/RC003-remote-photo.png"
+ditto --norsrc --noextattr --noqtn --noacl \
+  "$ROOT/Resources/SiriRemote-photo.png" \
+  "$APP_DIR/Contents/Resources/SiriRemote-photo.png"
 for icon_resource in \
   AppIcon.icns \
   StatusIconTemplate.png \
