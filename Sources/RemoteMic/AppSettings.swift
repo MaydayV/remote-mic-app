@@ -54,6 +54,7 @@ enum UsageEventSource: String, Codable, CaseIterable, Hashable {
     case bluetoothRemote = "bluetooth_remote"
     case nearbyPhone = "nearby_phone"
     case webRemote = "web_remote"
+    case siriRemote = "siri_remote"
     case unknown
 }
 
@@ -224,6 +225,7 @@ final class AppSettings: ObservableObject {
 
     private enum Keys {
         static let gainDB = "gainDB"
+        static let activeBackendKind = "activeBackendKind"
         static let selectedAudioDeviceUID = "selectedAudioDeviceUID"
         static let customMappingEnabled = "customMappingEnabled"
         static let legacyExclusiveHID = "exclusiveHID"
@@ -379,6 +381,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// 设置页选中的遥控器后端（持久化）
+    @Published private(set) var activeBackendKindRawValue: String {
+        didSet {
+            defaults.set(activeBackendKindRawValue, forKey: Keys.activeBackendKind)
+        }
+    }
+
     @Published private(set) var trustedPhoneIdentityFingerprints: Set<String> {
         didSet {
             defaults.set(
@@ -523,6 +532,8 @@ final class AppSettings: ObservableObject {
                 .flatMap { try? JSONDecoder().decode([VoiceSessionUsageRecord].self, from: $0) }
                 ?? []
         )
+        activeBackendKindRawValue = defaults.string(forKey: Keys.activeBackendKind)
+            ?? RemoteBackendKind.default.rawValue
         trustedPhoneIdentityFingerprints = Set(
             defaults.stringArray(forKey: Keys.trustedPhoneIdentityFingerprints) ?? []
         )
@@ -1139,6 +1150,10 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    func setActiveBackendKind(_ kind: RemoteBackendKind) {
+        activeBackendKindRawValue = kind.rawValue
+    }
+
     func isPhoneIdentityTrusted(_ fingerprint: String) -> Bool {
         trustedPhoneIdentityFingerprints.contains(fingerprint)
     }
@@ -1665,5 +1680,8 @@ final class AppSettings: ObservableObject {
         .volumeDown: .volumeDown,
         .menu: .contextMenu,
         .tv: .appSwitcher,
+        .playPause: .playPause,
+        .mute: .volumeMute,
+        .voice: .disabled,   // 语音键触发麦克风链路，不映射为按键动作
     ]
 }

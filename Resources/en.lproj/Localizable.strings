@@ -574,3 +574,20 @@
 "about.preferences.restart_onboarding_help" = "Recheck permissions, the remote, voice output device, and voice input without clearing existing connections, button mappings, or other settings.";
 "about.preferences.restart_onboarding_action" = "Run Again";
 "common.action.copy" = "Copy";
+
+"remote.button.full.play_pause" = "Play/Pause";
+"remote.button.full.mute" = "Mute";
+"remote.button.full.voice" = "Siri Voice";
+"remote.backend.siri_remote" = "Apple Siri Remote (3rd gen · USB-C)";
+"remote.backend.xiaomi" = "Xiaomi Bluetooth Remote 2 Pro";
+"remote.backend.select.title" = "Connected Device";
+
+
+"remote.backend.siri_detail" = "3rd-gen USB-C remote: navigation, select, back, play/pause, volume, mute and voice.";
+"remote.backend.siri_hint" = "Hold the Siri button to talk, release to end; Clickpad center confirms, edges navigate.";
+"remote.backend.battery" = "Battery %d%%";
+"remote.backend.siri_voice_hint" = "The voice key works with the virtual microphone: select the same audio device in the target app, then hold the Siri button and speak.";
+"remote.backend.siri_connected" = "Connected";
+"remote.backend.siri_disconnected" = "Not connected";
+
+"connection.remote.xiaomi_detail" = "Bluetooth remote with voice input and custom key mapping.";

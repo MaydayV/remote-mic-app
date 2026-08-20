@@ -14,6 +14,10 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
     case volumeDown = "volume_down"
     case menu
     case tv
+    // Siri Remote 专用键（小米后端永不发出；新增键位保持 Codable 兼容，历史持久化数据不受影响）
+    case playPause = "play_pause"
+    case mute = "mute"
+    case voice = "voice"
 
     var id: String { rawValue }
 
@@ -31,6 +35,9 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
         case .volumeDown: return 0x81
         case .menu: return 0x65
         case .tv: return 0x35
+        case .playPause: return 0xCD   // Consumer Page: Play/Pause
+        case .mute: return 0xE2        // Consumer Page: Mute
+        case .voice: return 0x04       // Consumer Page: Siri（实际 usage）
         }
     }
 
@@ -48,6 +55,9 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
         case .volumeDown: return "−"
         case .menu: return localization.text("remote.button.short.menu")
         case .tv: return "TV"
+        case .playPause: return "⏯"
+        case .mute: return "M"
+        case .voice: return "Siri"
         }
     }
 
@@ -65,6 +75,9 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
         case .volumeDown: return localization.text("remote.button.full.volume_down")
         case .menu: return localization.text("remote.button.full.menu")
         case .tv: return localization.text("remote.button.full.tv")
+        case .playPause: return localization.text("remote.button.full.play_pause")
+        case .mute: return localization.text("remote.button.full.mute")
+        case .voice: return localization.text("remote.button.full.voice")
         }
     }
 
@@ -90,6 +103,9 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
         case .volumeUp: return .systemKey(type: 0)
         case .volumeDown: return .systemKey(type: 1)
         case .back: return nil
+        case .playPause: return .systemKey(type: 16)  // NX_KEYTYPE_PLAY
+        case .mute: return .systemKey(type: 7)        // NX_KEYTYPE_MUTE
+        case .voice: return nil                       // 语音键触发麦克风链路，不产生系统事件
         }
     }
 }

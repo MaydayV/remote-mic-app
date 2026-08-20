@@ -977,7 +977,11 @@ struct RemoteButtonsTests {
     }
 
     @Test func usesVerifiedRC003UsageTable() {
-        #expect(RemoteButton.usageMap == [
+        // RC003（小米）的 verified usage 表 = 历史 12 键；Siri Remote 新增键单独验证
+        let rc003Buttons: Set<RemoteButton> = [.power, .up, .left, .ok, .right, .down, .back,
+                                               .volumeUp, .home, .volumeDown, .menu, .tv]
+        let rc003Map = RemoteButton.usageMap.filter { rc003Buttons.contains($0.value) }
+        #expect(rc003Map == [
             0x28: .ok,
             0x35: .tv,
             0x4A: .home,
@@ -991,6 +995,10 @@ struct RemoteButtonsTests {
             0x81: .volumeDown,
             0xF1: .back,
         ])
+        // Siri Remote 专用键（Consumer Page usage）
+        #expect(RemoteButton.usageMap[0xCD] == .playPause)
+        #expect(RemoteButton.usageMap[0xE2] == .mute)
+        #expect(RemoteButton.usageMap[0x04] == .voice)
     }
 
     @Test func HIDPermissionGateFailsClosed() {

@@ -468,6 +468,7 @@ struct SettingsView: View {
             PageHeader(title: localization.text("connection.page.title"))
         } content: {
             CompatibilityGlassContainer(spacing: 14) {
+                backendSelectionPanel
                 HStack(alignment: .top, spacing: 14) {
                     connectionDevicePanel
                         .frame(width: 230)
@@ -480,6 +481,120 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// "连接设备"选择面板：Apple Siri Remote / 小米蓝牙遥控器 2 Pro
+    private var backendSelectionPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("remote.backend.select.title")
+                .font(.headline)
+
+            HStack(spacing: 10) {
+                backendChoiceCard(
+                    kind: .xiaomi,
+                    icon: "appletvremote.gen4.fill",
+                    titleKey: "remote.backend.xiaomi",
+                    detailKey: "connection.remote.xiaomi_detail"
+                )
+                backendChoiceCard(
+                    kind: .siriRemote,
+                    icon: "apple.logo",
+                    titleKey: "remote.backend.siri_remote",
+                    detailKey: "remote.backend.siri_detail"
+                )
+            }
+
+            if model.activeBackendKind == .siriRemote {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "waveform.badge.mic")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 26)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let battery = model.siriRemoteBatteryLevel {
+                            Text(String(format: localization.text("remote.backend.battery"), battery))
+                                .font(.caption.weight(.semibold))
+                        }
+                        Text("remote.backend.siri_hint")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("remote.backend.siri_voice_hint")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+
+    private func backendChoiceCard(
+        kind: RemoteBackendKind,
+        icon: String,
+        titleKey: String,
+        detailKey: String
+    ) -> some View {
+        let isSelected = model.activeBackendKind == kind
+        return Button {
+            model.setActiveBackend(kind)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .frame(width: 34)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(titleKey)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text(detailKey)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if kind == .siriRemote {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(model.isSiriRemoteConnected ? Color.green : Color.secondary)
+                                .frame(width: 7, height: 7)
+                            Text(model.isSiriRemoteConnected
+                                 ? localization.text("remote.backend.siri_connected")
+                                 : localization.text("remote.backend.siri_disconnected"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.09)
+                    : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var phoneConnectionsPanel: some View {

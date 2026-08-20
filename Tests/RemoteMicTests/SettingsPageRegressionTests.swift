@@ -136,8 +136,10 @@ struct SettingsPageRegressionTests {
 
     @Test func remoteMappingLayoutCoversEveryRealButtonWithExactConnectorAnchors() throws {
         let placements = RemoteMappingLayout.buttonPlacements
-        #expect(placements.count == RemoteButton.allCases.count)
-        #expect(Set(placements.map(\.button)) == Set(RemoteButton.allCases))
+        // 映射画布呈现小米遥控器（RC003）的 12 键布局；Siri Remote 专用键不在画布上
+        let xiaomiButtons = Set(RemoteButton.allCases).subtracting([.playPause, .mute, .voice])
+        #expect(placements.count == xiaomiButtons.count)
+        #expect(Set(placements.map(\.button)) == xiaomiButtons)
 
         let expectedAnchors: [RemoteButton: UnitPoint] = [
             .power: UnitPoint(x: 0.386, y: 0.099),

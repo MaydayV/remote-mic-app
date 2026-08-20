@@ -275,12 +275,18 @@ final class VirtualAudioOutput {
     private var pendingDrainLogContexts: [String] = []
     private var drainCompletion: (() -> Void)?
     private var drainGeneration: UInt64 = 0
-    private let sourceFormat = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: 16_000,
-        channels: 1,
-        interleaved: false
-    )!
+
+    /// 当前输出采样率（动态）：小米链路 16 kHz，Siri Remote 链路 48 kHz。
+    /// 切换采样率时重建 engine（见 `enqueue(samples:sampleRate:)`）。
+    private var currentSampleRate: Double = 16_000
+    private var sourceFormat: AVAudioFormat {
+        AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: currentSampleRate,
+            channels: 1,
+            interleaved: false
+        )!
+    }
 
     private(set) var selectedDevice: AudioDeviceInfo?
     private(set) var status = LocalizedMessage("audio.output.none_selected")
@@ -294,8 +300,19 @@ final class VirtualAudioOutput {
 
     @discardableResult
     func configure(deviceUID: String) -> Bool {
+        configure(deviceUID: deviceUID, sampleRate: currentSampleRate)
+    }
+
+    @discardableResult
+    func configure(deviceUID: String, sampleRate: Double) -> Bool {
         let previousState = diagnosticState()
         stop()
+        guard sampleRate > 0 else {
+            status = LocalizedMessage("audio.output.none_selected")
+            AppLogger.shared.write("AUDIO CONFIGURE skipped reason=invalid_sample_rate sample_rate=\\(sampleRate)")
+            return false
+        }
+        currentSampleRate = sampleRate
         guard !deviceUID.isEmpty else {
             status = LocalizedMessage("audio.output.none_selected")
             AppLogger.shared.write("AUDIO CONFIGURE skipped reason=no_selected_device previous={\(previousState)}")
@@ -423,6 +440,22 @@ final class VirtualAudioOutput {
         return buffer
     }
 
+    private func makeBuffer(samples: [Float]) -> AVAudioPCMBuffer? {
+        guard !samples.isEmpty,
+              let buffer = AVAudioPCMBuffer(
+                pcmFormat: sourceFormat,
+                frameCapacity: AVAudioFrameCount(samples.count)
+              ),
+              let channel = buffer.floatChannelData?[0]
+        else { return nil }
+
+        for index in samples.indices {
+            channel[index] = samples[index]
+        }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        return buffer
+    }
+
     @discardableResult
     func enqueue(samples: [Int16]) -> Bool {
         guard let player, engine?.isRunning == true, let buffer = makeBuffer(samples: samples) else {
@@ -432,6 +465,36 @@ final class VirtualAudioOutput {
         if rejectedWriteCount > 0 {
             AppLogger.shared.write("AUDIO WRITE resumed rejected_count=\(rejectedWriteCount) state={\(basicDiagnosticState())}")
             rejectedWriteCount = 0
+        }
+        playbackLock.lock()
+        pendingVoiceBufferCount += 1
+        playbackLock.unlock()
+        player.scheduleBuffer(
+            buffer,
+            at: nil,
+            options: [],
+            completionCallbackType: .dataPlayedBack
+        ) { [weak self] _ in
+            self?.scheduledVoiceBufferDidFinish()
+        }
+        return true
+    }
+
+    @discardableResult
+    func enqueue(samples: [Float], sampleRate: Double) -> Bool {
+        guard sampleRate > 0, !samples.isEmpty else { return false }
+        // 动态采样率：采样率变化时重建 engine（如小米 16 kHz ↔ Siri Remote 48 kHz）
+        if sampleRate != currentSampleRate {
+            guard let deviceUID = selectedDevice?.uid,
+                  configure(deviceUID: deviceUID, sampleRate: sampleRate)
+            else {
+                logRejectedWrite()
+                return false
+            }
+        }
+        guard let player, engine?.isRunning == true, let buffer = makeBuffer(samples: samples) else {
+            logRejectedWrite()
+            return false
         }
         playbackLock.lock()
         pendingVoiceBufferCount += 1

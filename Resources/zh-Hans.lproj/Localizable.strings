@@ -574,3 +574,20 @@
 "about.preferences.restart_onboarding_help" = "重新检查权限、遥控器、语音输出设备和语音输入；不会清除现有连接、按键映射或其他设置。";
 "about.preferences.restart_onboarding_action" = "重新运行";
 "common.action.copy" = "复制";
+
+"remote.button.full.play_pause" = "播放/暂停";
+"remote.button.full.mute" = "静音";
+"remote.button.full.voice" = "Siri 语音";
+"remote.backend.siri_remote" = "Apple Siri Remote（第三代 · USB-C）";
+"remote.backend.xiaomi" = "小米蓝牙遥控器 2 Pro";
+"remote.backend.select.title" = "连接设备";
+
+
+"remote.backend.siri_detail" = "第三代 USB-C 遥控器，支持方向、确认、返回、播放/暂停、音量、静音与语音。";
+"remote.backend.siri_hint" = "按住 Siri 键说话，松开结束；Clickpad 中心确认，四周滑动方向。";
+"remote.backend.battery" = "电量 %d%%";
+"remote.backend.siri_voice_hint" = "语音键与虚拟麦克风配合使用：在目标 App 中选择同一个音频设备，然后按住 Siri 键说话。";
+"remote.backend.siri_connected" = "已连接";
+"remote.backend.siri_disconnected" = "未连接";
+
+"connection.remote.xiaomi_detail" = "支持语音输入与自定义按键映射的蓝牙遥控器。";

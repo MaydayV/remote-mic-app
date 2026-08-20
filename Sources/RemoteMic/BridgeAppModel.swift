@@ -54,6 +54,18 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var voiceShortcutStatus = LocalizedMessage("voice_button.status.preparing")
 
     private let audioOutput = VirtualAudioOutput()
+    /// 小米遥控器后端适配层（事件镜像；小米链路仍由本类直接管理）
+    private let xiaomiRemoteBackend = XiaomiRemoteBackend()
+    /// Siri Remote 后端（设置页选择后启用；两个后端可同时活跃，互不干扰）
+    /// 懒加载：@MainActor 初始化器在首次访问（主线程路径）时执行
+    private lazy var siriRemoteBackend = SiriRemoteBackend()
+    /// 当前选中的遥控器后端（设置页"连接设备"）
+    @Published private(set) var activeBackendKind: RemoteBackendKind = .xiaomi
+
+    /// Siri Remote 电量（后端读取 HID 属性后更新）
+    @Published private(set) var siriRemoteBatteryLevel: Int?
+    /// Siri Remote 是否已连接（后端检测到遥控器 HID 设备）
+    @Published private(set) var isSiriRemoteConnected = false
     private let phoneRemoteServer = PhoneRemoteServer()
     private let webRemoteClient = WebRemoteRelayClient()
     private let voiceFunctionMapper = RemoteVoiceFunctionMapper()
@@ -139,6 +151,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         privateFeature: PrivateFeatureIntegration = PrivateFeatureIntegration()
     ) {
         self.settings = settings
+        activeBackendKind = RemoteBackendKind(rawValue: settings.activeBackendKindRawValue)
+            ?? .xiaomi
         self.privateFeature = privateFeature
         audioDevices = initialAudioDevices
         audioOutput.onConfigurationChange = { [weak self] in
@@ -252,6 +266,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     func startIfNeeded() {
         guard !started else { return }
         started = true
+        configureSiriRemoteBackend()
         startAudioSubsystem()
         applyHIDSettings()
         terminationObserver = NotificationCenter.default.addObserver(
@@ -268,6 +283,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     }
 
     func stop() {
+        MainActor.assumeIsolated {
+            siriRemoteBackend.stop()
+        }
         privateFeature.stop()
         guard started else { return }
         started = false
@@ -906,6 +924,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 }
             }
             self.selectRemoteProfile(resolvedProfileID)
+            self.xiaomiRemoteBackend.forwardButton(button, isPressed: true)
             self.settings.recordButtonPress(
                 control: .remoteButton(button),
                 source: .bluetoothRemote
@@ -1021,6 +1040,70 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private var selectedBluetoothBridge: XiaomiBluetoothBridge? {
         guard let identifier = settings.selectedRemoteProfile?.bluetoothIdentifier else { return nil }
         return bluetoothBridges[identifier]
+    }
+
+    private func configureSiriRemoteBackend() {
+        MainActor.assumeIsolated {
+            siriRemoteBackend.onButton = { [weak self] button, isPressed in
+                DispatchQueue.main.async {
+                    self?.handleSiriRemoteButton(button, isPressed: isPressed)
+                }
+            }
+            siriRemoteBackend.onAudioSamples = { [weak self] samples, sampleRate in
+                DispatchQueue.main.async {
+                    _ = self?.audioOutput.enqueue(samples: samples, sampleRate: sampleRate)
+                }
+            }
+            siriRemoteBackend.onBatteryLevelChange = { [weak self] level in
+                DispatchQueue.main.async {
+                    self?.siriRemoteBatteryLevel = level
+                }
+            }
+            siriRemoteBackend.onConnectionStateChange = { [weak self] connected in
+                DispatchQueue.main.async {
+                    self?.isSiriRemoteConnected = connected
+                }
+            }
+        }
+    }
+
+    /// 切换设置页选中的遥控器后端。小米链路始终运行（不破坏现有功能）；
+    /// 选择 Siri Remote 时额外启动 Siri 后端。
+    func setActiveBackend(_ kind: RemoteBackendKind) {
+        guard kind != activeBackendKind else { return }
+        activeBackendKind = kind
+        settings.setActiveBackendKind(kind)
+        switch kind {
+        case .xiaomi:
+            MainActor.assumeIsolated {
+                siriRemoteBackend.stop()
+            }
+        case .siriRemote:
+            MainActor.assumeIsolated {
+                siriRemoteBackend.start()
+            }
+        }
+        AppLogger.shared.write("BACKEND switched kind=\(kind.rawValue)")
+    }
+
+    /// Siri Remote 按键：复用移动端手势体系（单击/双击/长按 → 配置动作）。
+    /// voice 键特判：控制麦克风语音会话（0xFA 音频流），不产生按键动作。
+    private func handleSiriRemoteButton(_ button: RemoteButton, isPressed: Bool) {
+        if button == .voice {
+            MainActor.assumeIsolated {
+                if isPressed {
+                    siriRemoteBackend.startMicrophone()
+                } else {
+                    siriRemoteBackend.stopMicrophone()
+                }
+            }
+            return
+        }
+        _ = handleMobileButtonEvent(
+            button,
+            phase: isPressed ? .press : .release,
+            source: .siriRemote
+        )
     }
 
     private func startBluetoothConnections() {
@@ -1238,6 +1321,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         else { return }
         let handledByFnTapMode = voiceFnTapSession.receive(samples)
         let enqueued = handledByFnTapMode || audioOutput.enqueue(samples: samples)
+        xiaomiRemoteBackend.forwardAudio(samples: samples)
         bluetoothVoiceDecodedBatchCount += 1
         bluetoothVoiceDecodedSampleCount += samples.count
         currentVoiceSampleCount &+= UInt64(samples.count)
@@ -1260,6 +1344,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     }
 
     func bluetoothBridge(_ bridge: XiaomiBluetoothBridge, didUpdateBatteryLevel level: Int?) {
+        xiaomiRemoteBackend.updateBatteryLevel(level)
         guard let profileID = remoteProfileID(for: bridge) else { return }
         if let level {
             remoteBatteryLevels[profileID] = min(100, max(0, level))
@@ -1535,7 +1620,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 settings.recordButtonPress(control: .remoteButton(button), source: source)
             }
             AppLogger.shared.write(
-                "PHONE REMOTE button=\(button.rawValue) trigger=\(trigger.rawValue) " +
+                "REMOTE BUTTON button=\(button.rawValue) trigger=\(trigger.rawValue) " +
                     "action=\(configured.action.rawValue) handled=\(handled)"
             )
             return handled
@@ -1549,7 +1634,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         settings.recordButtonPress(control: .remoteButton(button), source: source)
         AppLogger.shared.write(
-            "PHONE REMOTE button=\(button.rawValue) trigger=\(trigger.rawValue) " +
+            "REMOTE BUTTON button=\(button.rawValue) trigger=\(trigger.rawValue) " +
                 "action=\(configured.action.rawValue)"
         )
         return true
