@@ -14,7 +14,12 @@
 2026-08-19 Typeless 与实体遥控器识别候选新增两项回归：四种语音工具选择会同步 Fn 点按偏好，三种控制方式通过权限页都会应用；生产 HID 普通按键可以在语音 bridge 尚未 Ready 时证明实体控制已识别，同时后续真实语音门禁保持不变。26 项 Onboarding、312 项完整 Swift 测试、42 项项目自检、Apple Silicon / Intel Release 构建与实体路径 18 张生产页面检查通过；真实 Typeless 与 RC001 / RC003 仍需现场验收。
 
 1.9.3 真实日志确认未绑定 HID discovery 首报告死锁：设备匹配 157 次但没有一次 `HID REPORT` 或 `HID CONNECTED`。候选实现改为非独占探测安全候选，只有包含已知普通按键的首份真实报告才绑定实际设备，空闲或未知报告不会抢占；Remote buttons 86 项、Onboarding 26 项、完整 Swift 314 项/31 suites、硬件事件回放 21 项、项目自检 42/42 与 Apple Silicon / Intel Release 构建通过。真实 IOHID 回调、RC001 / RC003、双遥控器及电源键保护仍需按用例 4B-1 现场验收。
-2026-08-18 `codex/v1-9-0-onboarding` 固定基线集成复验：23 项 Onboarding 测试、237 项完整 Swift 测试、42 项项目自检、arm64 与 x86_64 Release 构建全部通过；三种控制方式共 58 张 Onboarding 截图逐张检查通过。另检查 800×650 设置页时发现固定主线基线的“按键映射 / Buttons”页标题与启用开关文案被挤压成竖排，中英文、浅深色均复现；该问题不是 Onboarding 七提交引入，但在 1.9.0 发布候选宣称全部设置入口通过前必须单独修复并复验。
+
+2026-08-20 权限卡候选增加已授权状态回归：蓝牙、输入监控和辅助功能整卡仍可点击并打开各自系统隐私页，已授权蓝牙不会额外重连。Onboarding 27 项、完整 Swift 313 项/31 suites、项目自检 42/42 通过；权限页浅色/深色生产视图无裁切、内部滚动或黑白分栏。正式签名改名权限连续性必须使用同 Team、Bundle ID 和 designated requirement 的 Remote Mic.app → SayAll.app 升级验证，ad-hoc 包不计入通过。
+
+Issue #100 增加升级首次启动矩阵：已完成用户在更新后缺任一权限时直接进入“权限与隐私”；全部正常、非更新启动和未完成 Onboarding 均不触发。Onboarding 28 项、完整 Swift 314 项/31 suites、项目自检 42/42 通过，权限页浅色/深色 `800 × 650` 无裁切。真实安装失败必须提供 `/var/log/install.log`，不能用删除旧 App 后偶然成功替代根因验证。
+
+1.9.3 真实日志确认未绑定 HID discovery 首报告死锁：设备匹配 157 次但没有一次 `HID REPORT` 或 `HID CONNECTED`。候选实现改为非独占探测安全候选，只有包含已知普通按键的首份真实报告才绑定实际设备，空闲或未知报告不会抢占；随后补充 `kIOReturnExclusiveAccess` 的通用占用提示和 Karabiner-Elements 专项操作说明。真实 IOHID 回调、RC001 / RC003、双遥控器、电源键及第三方 HID 工具仍需按用例 4B-1、4B-2 现场验收。2026-08-18 `codex/v1-9-0-onboarding` 固定基线集成复验：23 项 Onboarding 测试、237 项完整 Swift 测试、42 项项目自检、arm64 与 x86_64 Release 构建全部通过；三种控制方式共 58 张 Onboarding 截图逐张检查通过。另检查 800×650 设置页时发现固定主线基线的“按键映射 / Buttons”页标题与启用开关文案被挤压成竖排，中英文、浅深色均复现；该问题不是 Onboarding 七提交引入，但在 1.9.0 发布候选宣称全部设置入口通过前必须单独修复并复验。
 交付前至少确认：
 
 - 首次启动无法进入主面板，也没有跳过或稍后继续入口；
@@ -28,6 +33,7 @@
 - 从系统蓝牙设置返回后无需重启即可发现新配对遥控器；多个 HID service 部分映射失败时，安全设备普通按键仍可用且电源键不触发锁屏；
 
 - 未绑定遥控器匹配后日志出现 `HID DEVICE probing mode=monitored`，首个普通按键产生 `HID CONNECTED mode=probed` 与真实 report/edge；双遥控器仍按首份报告分别绑定且不重复执行；
+- HID 打开返回 `kIOReturnExclusiveAccess` 时显示通用第三方输入工具占用提示；Karabiner-Elements 已安装时显示关闭 “Modify events” 或设为 “Ignore” 的具体步骤，关闭后无需重启即可重新检测；
 - 遥控器页完整显示首次连接顺序：TV 键长按约 2 秒至底部白灯闪烁，再按 Home + Menu 进入配对；中英文均不得裁切；
 - 豆包/微信输入法选择后自动切换到对应系统输入源；两条分支显示各自浅色/深色设置截图，并共同显示系统 Fn 释放检查和微信 App 快捷键截图；
 - 语音工具四个选择卡等高、顶部对齐；豆包/微信四项设置位于右栏，切换任一指引时页面不滚动、不裁切；
