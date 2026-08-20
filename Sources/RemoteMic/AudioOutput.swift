@@ -236,10 +236,16 @@ enum CoreAudioDeviceCatalog {
 enum VirtualAudioConnectionLifecyclePolicy {
     static func shouldBeActive(
         readyBluetoothBridgeCount: Int,
+        siriRemoteReady: Bool = false,
+        siriRemoteVoiceActive: Bool = false,
         mobileVoiceActive: Bool,
         testToneActive: Bool
     ) -> Bool {
-        readyBluetoothBridgeCount > 0 || mobileVoiceActive || testToneActive
+        readyBluetoothBridgeCount > 0
+            || siriRemoteReady
+            || siriRemoteVoiceActive
+            || mobileVoiceActive
+            || testToneActive
     }
 }
 
@@ -278,7 +284,7 @@ final class VirtualAudioOutput {
 
     /// 当前输出采样率（动态）：小米链路 16 kHz，Siri Remote 链路 48 kHz。
     /// 切换采样率时重建 engine（见 `enqueue(samples:sampleRate:)`）。
-    private var currentSampleRate: Double = 16_000
+    private var currentSampleRate = RemoteAudioFormat.xiaomiSampleRate
     private var sourceFormat: AVAudioFormat {
         AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -309,7 +315,7 @@ final class VirtualAudioOutput {
         stop()
         guard sampleRate > 0 else {
             status = LocalizedMessage("audio.output.none_selected")
-            AppLogger.shared.write("AUDIO CONFIGURE skipped reason=invalid_sample_rate sample_rate=\\(sampleRate)")
+            AppLogger.shared.write("AUDIO CONFIGURE skipped reason=invalid_sample_rate sample_rate=\(sampleRate)")
             return false
         }
         currentSampleRate = sampleRate
@@ -458,6 +464,23 @@ final class VirtualAudioOutput {
 
     @discardableResult
     func enqueue(samples: [Int16]) -> Bool {
+        enqueue(samples: samples, sampleRate: RemoteAudioFormat.xiaomiSampleRate)
+    }
+
+    @discardableResult
+    func enqueue(samples: [Int16], sampleRate: Double) -> Bool {
+        guard sampleRate > 0, !samples.isEmpty else { return false }
+        if RemoteAudioFormat.needsReconfiguration(
+            current: currentSampleRate,
+            incoming: sampleRate
+        ) {
+            guard let deviceUID = selectedDevice?.uid,
+                  configure(deviceUID: deviceUID, sampleRate: sampleRate)
+            else {
+                logRejectedWrite()
+                return false
+            }
+        }
         guard let player, engine?.isRunning == true, let buffer = makeBuffer(samples: samples) else {
             logRejectedWrite()
             return false
@@ -484,7 +507,10 @@ final class VirtualAudioOutput {
     func enqueue(samples: [Float], sampleRate: Double) -> Bool {
         guard sampleRate > 0, !samples.isEmpty else { return false }
         // 动态采样率：采样率变化时重建 engine（如小米 16 kHz ↔ Siri Remote 48 kHz）
-        if sampleRate != currentSampleRate {
+        if RemoteAudioFormat.needsReconfiguration(
+            current: currentSampleRate,
+            incoming: sampleRate
+        ) {
             guard let deviceUID = selectedDevice?.uid,
                   configure(deviceUID: deviceUID, sampleRate: sampleRate)
             else {

@@ -61,4 +61,37 @@ enum RemoteBackendKind: String, Codable, CaseIterable, Identifiable {
 
     /// 默认后端：小米（保持现有行为）
     static let `default` = RemoteBackendKind.xiaomi
+
+    var supportedButtons: [RemoteButton] {
+        switch self {
+        case .xiaomi:
+            return RemoteButton.allCases.filter {
+                switch $0 {
+                case .playPause, .mute, .voice: return false
+                default: return true
+                }
+            }
+        case .siriRemote:
+            return [
+                .power, .up, .left, .ok, .right, .down, .back,
+                .volumeUp, .volumeDown, .menu, .tv,
+                .playPause, .mute, .voice,
+            ]
+        }
+    }
+}
+
+enum RemoteAudioFormat {
+    static let xiaomiSampleRate: Double = 16_000
+    static let siriRemoteSampleRate: Double = 48_000
+
+    static func needsReconfiguration(current: Double, incoming: Double) -> Bool {
+        incoming > 0 && abs(current - incoming) > 0.5
+    }
+}
+
+enum RemoteBackendRuntimePolicy {
+    static func shouldRunSiriRemote(activeKind: RemoteBackendKind) -> Bool {
+        activeKind == .siriRemote
+    }
 }

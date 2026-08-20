@@ -41,6 +41,22 @@ enum RemoteMicApp {
     @MainActor
     static func main() {
         if let screenshotDirectory = ProcessInfo.processInfo.environment[
+            "REMOTE_MIC_SETTINGS_SCREENSHOT_DIR"
+        ] {
+            do {
+                try OnboardingScreenshotRenderer.renderSiriRemoteSettings(
+                    to: URL(fileURLWithPath: screenshotDirectory, isDirectory: true),
+                    appearanceName: ProcessInfo.processInfo.environment[
+                        "REMOTE_MIC_SETTINGS_SCREENSHOT_APPEARANCE"
+                    ]
+                )
+            } catch {
+                fputs("Settings screenshot rendering failed: \(error)\n", stderr)
+                exit(EXIT_FAILURE)
+            }
+            return
+        }
+        if let screenshotDirectory = ProcessInfo.processInfo.environment[
             "REMOTE_MIC_ONBOARDING_SCREENSHOT_DIR"
         ] {
             do {

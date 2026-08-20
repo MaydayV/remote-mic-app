@@ -212,9 +212,9 @@
 - [ ] 支持苹果遥控器
   - 已完成 SiriRemoteForge、Wand、siri-remote-steamos、SiriRemoteVibe 及其他相关开源项目的可行性研究；当前总体首选 SiriRemoteForge，建议按“按键 → 触摸/滚动 → 麦克风高级组件”分阶段验证。
   - SiriRemoteForge 集成评估、候选项目源码与 Release 对比，以及暂停的 Apple Remote Windows 路线研究均已迁移至独立的产品资料工作区。
-  - 2026-08-19 基于 VibeRemote 协议数据（0xAF input-enable、0xFB 按键 usage、0xFA 99-byte Opus CELT 48kHz）实现 Siri Remote（第三代 USB-C）后端：`RemoteBackend` 统一协议、`SiriRemoteBackend`（HID 发现/0xAF/按键映射）、`OpusDecoder`（系统 AudioToolbox，无第三方依赖）、虚拟麦克风 48kHz 动态采样率；设置页新增“连接设备”选择（Apple Siri Remote / 小米遥控器 2 Pro），小米链路零改动。自动化 233 项全绿（新增 usage 映射与 99-byte 报告解析 11 项）。
+  - 2026-08-19 基于 VibeRemote 协议数据（0xAF input-enable、0xFB 按键 usage、0xFA 99-byte Opus CELT 48kHz）实现 Siri Remote（第三代 USB-C）后端：`RemoteBackend` 统一协议、`SiriRemoteBackend`（HID 发现/0xAF/按键映射）、`OpusDecoder`（系统 AudioToolbox，无第三方依赖）、虚拟麦克风 48kHz 动态采样率；设置页新增“连接设备”选择（Apple Siri Remote / 小米遥控器 2 Pro），小米链路保持原实现。
   - 待真机验收：按键映射（U2）、语音链路（U3）、双后端共存（U5）及小米回归（U4），见 `Testing/SiriRemoteIntegration.md`；已知风险：macOS 可能阻断 Direct HID 0xFA 音频交付（VibeRemote 记载），若真机确认则转 PacketLogger 方案。
-  - 2026-08-20 补充电量读取（HID `BatteryLevel`/`BatteryPercent` 属性，连接后立即读取、2 秒延迟重试）与设置页连接状态显示（Siri Remote 卡片显示已连接/未连接，断开时自动置灰并清空电量），自动化 239 项全绿（新增 6 项电量解析测试）；电量实际取值与连接状态切换仍待真机确认。
+  - 2026-08-20 完成开发复核与补强：持久化选择会在重启后启动 Siri 后端；系统关键 HID 集合改为共享打开并补齐匹配页、移除/退出安全清理和 registry stale watchdog；Siri 语音纳入 Fn 会话、统计及虚拟音频生命周期，修复 48 kHz → 小米 16 kHz 切回时三倍速及预滚混采样率问题，并拒绝非当前后端的并发语音流；设置页补齐 Siri Remote 平铺映射及独立连接状态面板；电量增加标准 BLE Battery Service（180F/2A19）兜底且不主动断开系统 HID 链路。自动化 247 项全绿；Direct HID 0xFA 音频与 BLE 电量仍待真机确认。
 - [ ] 支持 Xiaomi Bluetooth Remote Control 2（RC001-MS）
   - 已通过真机确认 RC001-MS 可以连接 Mac，除语音键之外的普通按键能够被现有 App 或 macOS 识别；语音键没有普通按键事件不代表设备没有语音能力，当前未知项是 Voice GATT / HID Report、音频包格式和编码方式。
   - 实现前先记录现有 RC003-MS 的服务、Characteristic、控制包、音频包和解码基线，再为 RC001-MS 增加只用于诊断的完整 Service Discovery、Notify / Indicate 订阅和受控数据日志；不得根据同系列型号猜测 UUID 或直接复制 RC003 常量。

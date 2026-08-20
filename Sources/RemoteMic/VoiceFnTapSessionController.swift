@@ -42,7 +42,7 @@ final class VoiceFnTapSessionController {
 
     typealias Scheduler = (TimeInterval, @escaping () -> Void) -> VoiceFnTapScheduledTask
     typealias FunctionKeySetter = (Bool) -> Bool
-    typealias AudioEnqueuer = ([Int16]) -> Void
+    typealias AudioEnqueuer = ([Int16], Double) -> Void
     typealias AudioDrainer = (@escaping () -> Void) -> Void
     typealias DestinationReadiness = (
         @escaping (VoiceInputDestinationWaitResult) -> Void
@@ -50,6 +50,7 @@ final class VoiceFnTapSessionController {
 
     private struct PendingVoice {
         var samples: [Int16] = []
+        var sampleRate = RemoteAudioFormat.xiaomiSampleRate
         var ended = false
     }
 
@@ -68,6 +69,7 @@ final class VoiceFnTapSessionController {
     private(set) var isSuspended = false
     private var generation: UInt64 = 0
     private var preRoll: [Int16] = []
+    private var preRollSampleRate = RemoteAudioFormat.xiaomiSampleRate
     private var remoteEnded = false
     private var pendingVoice: PendingVoice?
     private var scheduledTasks: [VoiceFnTapScheduledTask] = []
@@ -86,7 +88,7 @@ final class VoiceFnTapSessionController {
         schedule: @escaping Scheduler = VoiceFnTapScheduledTask.mainQueue,
         destinationReadiness: @escaping DestinationReadiness = { _ in .immediate },
         setFunctionKeyPressed: @escaping FunctionKeySetter,
-        enqueueAudio: @escaping AudioEnqueuer,
+        enqueueAudioWithSampleRate: @escaping AudioEnqueuer,
         drainAudio: @escaping AudioDrainer,
         onFailure: @escaping (VoiceFnTapFailure) -> Void
     ) {
@@ -96,9 +98,33 @@ final class VoiceFnTapSessionController {
         self.schedule = schedule
         self.destinationReadiness = destinationReadiness
         self.setFunctionKeyPressed = setFunctionKeyPressed
-        self.enqueueAudio = enqueueAudio
+        enqueueAudio = enqueueAudioWithSampleRate
         self.drainAudio = drainAudio
         self.onFailure = onFailure
+    }
+
+    convenience init(
+        startDelay: TimeInterval = 0.15,
+        tapDuration: TimeInterval = 0.12,
+        maximumPreRollSampleCount: Int = 80_000,
+        schedule: @escaping Scheduler = VoiceFnTapScheduledTask.mainQueue,
+        destinationReadiness: @escaping DestinationReadiness = { _ in .immediate },
+        setFunctionKeyPressed: @escaping FunctionKeySetter,
+        enqueueAudio: @escaping ([Int16]) -> Void,
+        drainAudio: @escaping AudioDrainer,
+        onFailure: @escaping (VoiceFnTapFailure) -> Void
+    ) {
+        self.init(
+            startDelay: startDelay,
+            tapDuration: tapDuration,
+            maximumPreRollSampleCount: maximumPreRollSampleCount,
+            schedule: schedule,
+            destinationReadiness: destinationReadiness,
+            setFunctionKeyPressed: setFunctionKeyPressed,
+            enqueueAudioWithSampleRate: { samples, _ in enqueueAudio(samples) },
+            drainAudio: drainAudio,
+            onFailure: onFailure
+        )
     }
 
     func setEnabled(_ enabled: Bool, completion: (() -> Void)? = nil) {
@@ -146,19 +172,24 @@ final class VoiceFnTapSessionController {
 
     @discardableResult
     func receive(_ samples: [Int16]) -> Bool {
+        receive(samples, sampleRate: RemoteAudioFormat.xiaomiSampleRate)
+    }
+
+    @discardableResult
+    func receive(_ samples: [Int16], sampleRate: Double) -> Bool {
         guard !samples.isEmpty else {
             return phase != .idle || pendingVoice != nil || suppressAudioUntilRemoteStop
         }
         if pendingVoice != nil {
-            appendPreRoll(samples, toPendingVoice: true)
+            appendPreRoll(samples, sampleRate: sampleRate, toPendingVoice: true)
             return true
         }
         switch phase {
         case .starting:
-            appendPreRoll(samples, toPendingVoice: false)
+            appendPreRoll(samples, sampleRate: sampleRate, toPendingVoice: false)
             return true
         case .active:
-            enqueueAudio(samples)
+            enqueueAudio(samples, sampleRate)
             return true
         case .draining, .stopping:
             return true
@@ -223,6 +254,7 @@ final class VoiceFnTapSessionController {
         let sessionGeneration = generation
         phase = .starting(sessionGeneration)
         preRoll = preloaded?.samples ?? []
+        preRollSampleRate = preloaded?.sampleRate ?? RemoteAudioFormat.xiaomiSampleRate
         remoteEnded = preloaded?.ended ?? false
         switch destinationReadiness({ [weak self] result in
             self?.destinationReadinessCompleted(result, generation: sessionGeneration)
@@ -278,7 +310,7 @@ final class VoiceFnTapSessionController {
             }
             self.phase = .active(sessionGeneration)
             if !self.preRoll.isEmpty {
-                self.enqueueAudio(self.preRoll)
+                self.enqueueAudio(self.preRoll, self.preRollSampleRate)
                 self.preRoll.removeAll(keepingCapacity: false)
             }
             if self.remoteEnded {
@@ -392,6 +424,7 @@ final class VoiceFnTapSessionController {
     private func resetSessionState() {
         phase = .idle
         preRoll.removeAll(keepingCapacity: false)
+        preRollSampleRate = RemoteAudioFormat.xiaomiSampleRate
         remoteEnded = false
         cancelScheduledTasks()
         releaseFunctionKeyIfNeeded()
@@ -416,17 +449,46 @@ final class VoiceFnTapSessionController {
         return down && up
     }
 
-    private func appendPreRoll(_ samples: [Int16], toPendingVoice: Bool) {
+    private func appendPreRoll(
+        _ samples: [Int16],
+        sampleRate: Double,
+        toPendingVoice: Bool
+    ) {
+        let safeSampleRate = sampleRate > 0 ? sampleRate : RemoteAudioFormat.xiaomiSampleRate
+        let maximumDuration = Double(maximumPreRollSampleCount)
+            / RemoteAudioFormat.xiaomiSampleRate
+        let maximumCount = max(1, Int(maximumDuration * safeSampleRate))
         if toPendingVoice {
+            if let pendingSampleRate = pendingVoice?.sampleRate,
+               pendingVoice?.samples.isEmpty == false,
+               RemoteAudioFormat.needsReconfiguration(
+                   current: pendingSampleRate,
+                   incoming: safeSampleRate
+               ) {
+                pendingVoice?.samples.removeAll(keepingCapacity: true)
+            }
+            if pendingVoice?.samples.isEmpty == true {
+                pendingVoice?.sampleRate = safeSampleRate
+            }
             pendingVoice?.samples.append(contentsOf: samples)
-            if let count = pendingVoice?.samples.count, count > maximumPreRollSampleCount {
-                pendingVoice?.samples.removeFirst(count - maximumPreRollSampleCount)
+            if let count = pendingVoice?.samples.count, count > maximumCount {
+                pendingVoice?.samples.removeFirst(count - maximumCount)
             }
             return
         }
+        if !preRoll.isEmpty,
+           RemoteAudioFormat.needsReconfiguration(
+               current: preRollSampleRate,
+               incoming: safeSampleRate
+           ) {
+            preRoll.removeAll(keepingCapacity: true)
+        }
+        if preRoll.isEmpty {
+            preRollSampleRate = safeSampleRate
+        }
         preRoll.append(contentsOf: samples)
-        if preRoll.count > maximumPreRollSampleCount {
-            preRoll.removeFirst(preRoll.count - maximumPreRollSampleCount)
+        if preRoll.count > maximumCount {
+            preRoll.removeFirst(preRoll.count - maximumCount)
         }
     }
 

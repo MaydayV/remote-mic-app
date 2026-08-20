@@ -25,18 +25,14 @@ import IOKit.hid
 /// IOHID 回调在主 RunLoop 投递，因此本类标记 @MainActor，避免 teardown 与事件竞态
 /// （与 VibeRemote RemoteInputHandler 相同模型）。
 @MainActor
-final class SiriRemoteBackend: RemoteBackend {
+final class SiriRemoteBackend: @MainActor RemoteBackend {
     /// nonisolated：HID 发现/回调均注册在主 RunLoop，对象创建可在任意执行器完成
     nonisolated init() {}
 
     let deviceName = "Apple Siri Remote"
 
     /// Siri Remote 支持的全部按键（含 Clickpad 点击 → .ok）
-    let supportedButtons: [RemoteButton] = [
-        .power, .up, .left, .ok, .right, .down, .back,
-        .volumeUp, .volumeDown, .menu, .tv,
-        .playPause, .mute, .voice,
-    ]
+    let supportedButtons = RemoteBackendKind.siriRemote.supportedButtons
 
     private(set) var batteryLevel: Int? {
         didSet {
@@ -52,6 +48,8 @@ final class SiriRemoteBackend: RemoteBackend {
     var onBatteryLevelChange: ((Int?) -> Void)?
     /// 连接状态变化回调（HID 设备匹配/移除时触发）
     var onConnectionStateChange: ((Bool) -> Void)?
+    /// 音频流自身结束（用于在按键 release 丢失时关闭上层语音会话）
+    var onVoiceStreamEnded: (() -> Void)?
 
     /// 是否已检测到并持有遥控器 HID 设备
     var isConnected: Bool { !devices.isEmpty }
@@ -70,6 +68,10 @@ final class SiriRemoteBackend: RemoteBackend {
     private var hidManager: IOHIDManager?
     private var devices: [ObjectIdentifier: IOHIDDevice] = [:]
     private var deviceNames: [ObjectIdentifier: String] = [:]
+    private var deviceRegistryIDs: [ObjectIdentifier: UInt64] = [:]
+    private var healthTimer: Timer?
+    private lazy var batteryReader = SiriRemoteBatteryReader()
+    private var batteryRefreshTimer: Timer?
     private var started = false
 
     /// 音频报告回调注册（M3 使用；按键接口在 M2 可用）
@@ -103,6 +105,12 @@ final class SiriRemoteBackend: RemoteBackend {
         if opusDecoder == nil {
             opusDecoder = try? OpusDecoder()
         }
+        guard opusDecoder != nil else {
+            voiceActive = false
+            AppLogger.shared.write("SIRI REMOTE voice unavailable reason=opus_decoder_init_failed")
+            onVoiceStreamEnded?()
+            return
+        }
         voiceActive = true
     }
 
@@ -124,6 +132,9 @@ final class SiriRemoteBackend: RemoteBackend {
             [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0x20],
             [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0xFF00],
             [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0xFF01],
+            [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0xFF02],
+            [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0x01],
+            [kIOHIDVendorIDKey: appleVendorID, kIOHIDPrimaryUsagePageKey: 0x09],
         ]
         IOHIDManagerSetDeviceMatchingMultiple(manager, matchingDicts as CFArray)
 
@@ -140,34 +151,47 @@ final class SiriRemoteBackend: RemoteBackend {
         }, context)
 
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
-        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if result == kIOReturnNotPermitted {
+            AppLogger.shared.write("SIRI REMOTE detection denied input_monitoring_required=true")
+        } else if result != kIOReturnSuccess {
+            AppLogger.shared.write(
+                "SIRI REMOTE detection failed result=0x\(String(result, radix: 16))"
+            )
+        }
+        healthTimer?.invalidate()
+        healthTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.recoverFromStaleInterfacesIfNeeded()
+            }
+        }
     }
 
     private func disconnectAll() {
-        // 卸载全部设备回调（含非音频接口的 input value 回调），防止悬挂回调访问已释放状态
-        for (id, registration) in audioReportRegistrations {
-            if let device = devices[id] {
-                IOHIDDeviceRegisterInputReportCallback(
-                    device,
-                    registration.buffer,
-                    registration.size,
-                    nil,
-                    nil
-                )
-            }
-            registration.buffer.deallocate()
-        }
-        for device in devices.values {
-            IOHIDDeviceRegisterInputValueCallback(device, nil, nil)
-        }
-        audioReportRegistrations.removeAll()
+        healthTimer?.invalidate()
+        healthTimer = nil
+        batteryRefreshTimer?.invalidate()
+        batteryRefreshTimer = nil
+        batteryReader.cancel()
+        let openedDevices = devices
         devices.removeAll()
         deviceNames.removeAll()
+        deviceRegistryIDs.removeAll()
+        releaseAllButtons()
+        for (id, device) in openedDevices {
+            closeDevice(device, id: id)
+        }
         if let manager = hidManager {
+            IOHIDManagerRegisterDeviceMatchingCallback(manager, nil, nil)
+            IOHIDManagerRegisterDeviceRemovalCallback(manager, nil, nil)
             IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         }
         hidManager = nil
+        if voiceActive {
+            voiceActive = false
+            onVoiceStreamEnded?()
+        }
         batteryLevel = nil
         onConnectionStateChange?(false)
     }
@@ -177,6 +201,7 @@ final class SiriRemoteBackend: RemoteBackend {
     private func handleDeviceMatched(_ device: IOHIDDevice) {
         let id = ObjectIdentifier(device)
         guard devices[id] == nil else { return }
+        let wasDisconnected = devices.isEmpty
 
         let vendor = Self.property(kIOHIDVendorIDKey, of: device) ?? 0
         let product = Self.property(kIOHIDProductIDKey, of: device) ?? 0
@@ -196,16 +221,32 @@ final class SiriRemoteBackend: RemoteBackend {
         devices[id] = device
         deviceNames[id] = productName ?? String(format: "0x%04X", product)
 
-        // 打开接口（优先 Seize 获取独占，失败则降级为监听）
-        var openOptions: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeSeizeDevice)
+        // Siri 与音频集合必须让 Apple 系统驱动同时观察；其他接口才尝试独占。
+        let requiresSharedAccess = Self.requiresSharedSystemAccess(
+            usagePage: usagePage,
+            usage: usage
+        )
+        var openOptions: IOOptionBits = requiresSharedAccess
+            ? IOOptionBits(kIOHIDOptionsTypeNone)
+            : IOOptionBits(kIOHIDOptionsTypeSeizeDevice)
         var openResult = IOHIDDeviceOpen(device, openOptions)
-        if openResult != kIOReturnSuccess {
+        if openResult != kIOReturnSuccess,
+           openOptions == IOOptionBits(kIOHIDOptionsTypeSeizeDevice) {
             openOptions = IOOptionBits(kIOHIDOptionsTypeNone)
             openResult = IOHIDDeviceOpen(device, openOptions)
         }
         guard openResult == kIOReturnSuccess else {
             devices.removeValue(forKey: id)
+            deviceNames.removeValue(forKey: id)
             return
+        }
+
+        let service = IOHIDDeviceGetService(device)
+        if service != IO_OBJECT_NULL {
+            var registryID: UInt64 = 0
+            if IORegistryEntryGetRegistryEntryID(service, &registryID) == KERN_SUCCESS {
+                deviceRegistryIDs[id] = registryID
+            }
         }
 
         // 注册输入值回调（按键 usage 事件）
@@ -227,7 +268,10 @@ final class SiriRemoteBackend: RemoteBackend {
                 buffer,
                 maxReportSize,
                 { context, result, sender, type, reportID, report, reportLength in
-                    guard type == kIOHIDReportTypeInput, let context else { return }
+                    guard result == kIOReturnSuccess,
+                          type == kIOHIDReportTypeInput,
+                          let context
+                    else { return }
                     let backend = Unmanaged<SiriRemoteBackend>.fromOpaque(context).takeUnretainedValue()
                     backend.handleAudioReport(
                         reportID: reportID,
@@ -244,20 +288,79 @@ final class SiriRemoteBackend: RemoteBackend {
 
         // 读取电量（系统可能稍后才同步属性，内部带延迟重试）
         readBatteryLevel(from: device)
+        if wasDisconnected {
+            refreshBatteryLevelUsingBluetooth()
+            batteryRefreshTimer?.invalidate()
+            batteryRefreshTimer = Timer.scheduledTimer(
+                withTimeInterval: 300,
+                repeats: true
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.refreshBatteryLevelUsingBluetooth()
+                }
+            }
+        }
         onConnectionStateChange?(true)
     }
 
     private func handleDeviceRemoved(_ device: IOHIDDevice) {
         let id = ObjectIdentifier(device)
-        guard devices[id] != nil else { return }
-        if let registration = audioReportRegistrations.removeValue(forKey: id) {
-            registration.buffer.deallocate()
-        }
-        devices.removeValue(forKey: id)
+        guard let openedDevice = devices.removeValue(forKey: id) else { return }
+        closeDevice(openedDevice, id: id)
         deviceNames.removeValue(forKey: id)
+        deviceRegistryIDs.removeValue(forKey: id)
+        releaseAllButtons()
         if devices.isEmpty {
+            batteryRefreshTimer?.invalidate()
+            batteryRefreshTimer = nil
+            batteryReader.cancel()
+            if voiceActive {
+                voiceActive = false
+                onVoiceStreamEnded?()
+            }
+            batteryLevel = nil
             onConnectionStateChange?(false)
         }
+    }
+
+    private func closeDevice(_ device: IOHIDDevice, id: ObjectIdentifier) {
+        IOHIDDeviceRegisterInputValueCallback(device, nil, nil)
+        if let registration = audioReportRegistrations.removeValue(forKey: id) {
+            IOHIDDeviceRegisterInputReportCallback(
+                device,
+                registration.buffer,
+                registration.size,
+                nil,
+                nil
+            )
+            registration.buffer.deallocate()
+        }
+        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+    }
+
+    private func releaseAllButtons() {
+        let pressedButtons = buttonState.compactMap { button, isPressed in
+            isPressed ? button : nil
+        }
+        buttonState.removeAll()
+        for button in pressedButtons {
+            onButton?(button, false)
+        }
+    }
+
+    private func recoverFromStaleInterfacesIfNeeded() {
+        guard started, !deviceRegistryIDs.isEmpty else { return }
+        let hasStaleInterface = deviceRegistryIDs.values.contains { registryID in
+            let service = IOServiceGetMatchingService(0, IORegistryEntryIDMatching(registryID))
+            guard service != IO_OBJECT_NULL else { return true }
+            IOObjectRelease(service)
+            return false
+        }
+        guard hasStaleInterface else { return }
+        AppLogger.shared.write("SIRI REMOTE stale HID interface detected; restarting discovery")
+        disconnectAll()
+        guard started else { return }
+        startDetection()
     }
 
     // MARK: - 按键事件
@@ -322,7 +425,10 @@ final class SiriRemoteBackend: RemoteBackend {
                 else { continue }
                 onAudioSamples?(samples, 48_000)
             case .ended:
-                voiceActive = false
+                if voiceActive {
+                    voiceActive = false
+                    onVoiceStreamEnded?()
+                }
             }
         }
     }
@@ -357,6 +463,10 @@ final class SiriRemoteBackend: RemoteBackend {
                 AppLogger.shared.write(
                     "SIRI REMOTE 0xAF write failed result=0x\(String(result, radix: 16))"
                 )
+            } else {
+                AppLogger.shared.write(
+                    "SIRI REMOTE 0xAF write succeeded payload_bytes=\(payload.count)"
+                )
             }
         }
     }
@@ -380,6 +490,14 @@ final class SiriRemoteBackend: RemoteBackend {
                   self.batteryLevel == nil
             else { return }
             attempt()
+        }
+    }
+
+    private func refreshBatteryLevelUsingBluetooth() {
+        guard !devices.isEmpty else { return }
+        batteryReader.read { [weak self] level in
+            guard let self, !self.devices.isEmpty, let level else { return }
+            self.batteryLevel = level
         }
     }
 
@@ -414,9 +532,16 @@ final class SiriRemoteBackend: RemoteBackend {
         usagePage == 0x0C && usage == 0x04
     }
 
+    nonisolated static func requiresSharedSystemAccess(usagePage: Int, usage: Int) -> Bool {
+        isAudioInterface(usagePage: usagePage, usage: usage)
+            || (usagePage == 0x0C && usage == 0x01)
+    }
+
     nonisolated static func isLikelyRemoteName(_ name: String) -> Bool {
         let lowered = name.lowercased()
-        return lowered.contains("remote") || lowered.contains("siri")
+        return lowered.contains("remote")
+            || lowered.contains("siri")
+            || lowered.contains("apple tv")
     }
 
     nonisolated static func property(_ key: String, of device: IOHIDDevice) -> Int? {

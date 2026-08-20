@@ -58,6 +58,23 @@ struct SiriRemoteBackendTests {
             #expect(backendButtons.contains(required), Comment(rawValue: required.rawValue))
         }
     }
+
+    @Test func persistedSiriSelectionRequiresBackendAtStartup() {
+        #expect(RemoteBackendRuntimePolicy.shouldRunSiriRemote(activeKind: .siriRemote))
+        #expect(!RemoteBackendRuntimePolicy.shouldRunSiriRemote(activeKind: .xiaomi))
+    }
+
+    @Test func keepsSystemCriticalConsumerCollectionsShared() {
+        #expect(SiriRemoteBackend.requiresSharedSystemAccess(usagePage: 0x0C, usage: 0x04))
+        #expect(SiriRemoteBackend.requiresSharedSystemAccess(usagePage: 0x0C, usage: 0x01))
+        #expect(!SiriRemoteBackend.requiresSharedSystemAccess(usagePage: 0x0D, usage: 0x05))
+    }
+
+    @Test func batteryReaderRecognizesAppleRemoteNames() {
+        #expect(SiriRemoteBatteryReader.isLikelyRemoteName("Apple TV Remote"))
+        #expect(SiriRemoteBatteryReader.isLikelyRemoteName("Marcus Siri Remote"))
+        #expect(!SiriRemoteBatteryReader.isLikelyRemoteName("Magic Mouse"))
+    }
 }
 
 private extension RemoteButton {
@@ -97,7 +114,7 @@ extension SiriRemoteBackendTests {
     }
 
     @Test func zeroLengthReportIsReleaseSentinel() {
-        var bytes = [UInt8](repeating: 0, count: 99)
+        let bytes = [UInt8](repeating: 0, count: 99)
         #expect(SiriRemoteAudioReportParser.events(from: bytes) == [.ended])
     }
 

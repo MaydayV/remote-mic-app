@@ -380,6 +380,30 @@ struct SettingsPageRegressionTests {
         ))
     }
 
+    @Test func siriRemotePagesUseTheirOwnLocalizedDevicePresentation() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/SettingsView.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("Text(localization.text(titleKey))"))
+        #expect(source.contains("Text(localization.text(detailKey))"))
+        #expect(source.contains("private var siriRemoteConnectionPanel"))
+        #expect(source.contains("private var siriRemoteMappingStatusCard"))
+        #expect(source.contains("if model.activeBackendKind == .siriRemote"))
+        #expect(source.contains("RemoteBackendKind.siriRemote.supportedButtons.filter"))
+        #expect(source.contains("minHeight: 102, maxHeight: 102"))
+        #expect(source.contains("remote.backend.xiaomi_voice_hint"))
+        #expect(!source.contains(".font(.caption2"))
+        for size in [8, 9, 10, 11] {
+            #expect(!source.contains(".font(.system(size: \(size)"))
+        }
+    }
+
     @Test func aboutPageKeepsVersionFeaturesTogetherAndLanguagesVisible() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

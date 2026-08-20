@@ -5,7 +5,7 @@ import CoreBluetooth
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum SettingsSection: String, CaseIterable, Identifiable {
+enum SettingsSection: String, CaseIterable, Identifiable {
     case connection
     case privateFeature
     case mapping
@@ -162,7 +162,7 @@ struct SettingsView: View {
     private let refreshUpdateInformation: () -> Void
     private let setDockIconVisible: (Bool) -> Void
 
-    @State private var selectedSection: SettingsSection = .connection
+    @State private var selectedSection: SettingsSection
     @State private var selectedRemoteButton: RemoteButton = .ok
     @State private var isMappingSelectionLocked = true
     @State private var selectedUsagePeriod: UsageStatisticsPeriod = .today
@@ -192,6 +192,7 @@ struct SettingsView: View {
     init(
         model: BridgeAppModel,
         updateInformation: UpdateInformationStore,
+        initialSection: SettingsSection = .connection,
         checkForUpdates: @escaping () -> Void = {},
         refreshUpdateInformation: @escaping () -> Void = {},
         setDockIconVisible: @escaping (Bool) -> Void = { _ in }
@@ -200,6 +201,7 @@ struct SettingsView: View {
         settings = model.settings
         privateFeature = model.privateFeature
         self.updateInformation = updateInformation
+        _selectedSection = State(initialValue: initialSection)
         self.checkForUpdates = checkForUpdates
         self.refreshUpdateInformation = refreshUpdateInformation
         self.setDockIconVisible = setDockIconVisible
@@ -504,31 +506,29 @@ struct SettingsView: View {
                 )
             }
 
-            if model.activeBackendKind == .siriRemote {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "waveform.badge.mic")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 26)
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let battery = model.siriRemoteBatteryLevel {
-                            Text(String(format: localization.text("remote.backend.battery"), battery))
-                                .font(.caption.weight(.semibold))
-                        }
-                        Text("remote.backend.siri_hint")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("remote.backend.siri_voice_hint")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "waveform.badge.mic")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 26)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.activeBackendKind == .siriRemote
+                         ? "remote.backend.siri_hint"
+                         : "remote.backend.xiaomi_hint")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(model.activeBackendKind == .siriRemote
+                         ? "remote.backend.siri_voice_hint"
+                         : "remote.backend.xiaomi_voice_hint")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
             }
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+            .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -549,27 +549,30 @@ struct SettingsView: View {
                     .frame(width: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(titleKey)
+                    Text(localization.text(titleKey))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text(detailKey)
+                        .lineLimit(1)
+                    Text(localization.text(detailKey))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
+                        .frame(height: 32, alignment: .topLeading)
 
-                    if kind == .siriRemote {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(model.isSiriRemoteConnected ? Color.green : Color.secondary)
-                                .frame(width: 7, height: 7)
-                            Text(model.isSiriRemoteConnected
-                                 ? localization.text("remote.backend.siri_connected")
-                                 : localization.text("remote.backend.siri_disconnected"))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.top, 2)
+                    let isConnected = kind == .siriRemote
+                        ? model.isSiriRemoteConnected
+                        : model.isConnected
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(isConnected ? Color.green : Color.secondary)
+                            .frame(width: 7, height: 7)
+                        Text(localization.text(
+                            isConnected ? "common.status.connected" : "remote.device.disconnected"
+                        ))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                     }
+                    .padding(.top, 2)
                 }
 
                 Spacer(minLength: 8)
@@ -579,7 +582,7 @@ struct SettingsView: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 102, maxHeight: 102, alignment: .leading)
             .background(
                 isSelected
                     ? Color.accentColor.opacity(0.09)
@@ -615,7 +618,7 @@ struct SettingsView: View {
                                 Text("connection.phone.ios_title")
                                     .font(.subheadline.weight(.semibold))
                                 Text("connection.phone.no_invite_badge")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.secondary)
                             }
                             Text("connection.phone.ios_help")
@@ -723,7 +726,16 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var connectionDevicePanel: some View {
+        if model.activeBackendKind == .siriRemote {
+            siriRemoteConnectionPanel
+        } else {
+            xiaomiConnectionDevicePanel
+        }
+    }
+
+    private var xiaomiConnectionDevicePanel: some View {
         GlassPanel {
             VStack(spacing: 16) {
                 remoteDeviceSelector(vertical: true)
@@ -763,6 +775,77 @@ struct SettingsView: View {
                     .compatibilityRoundedButtonBorderShape(radius: 10)
                     .frame(maxWidth: .infinity)
 
+            }
+        }
+    }
+
+    private var siriRemoteConnectionPanel: some View {
+        GlassPanel {
+            VStack(spacing: 16) {
+                HStack(spacing: 10) {
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 30)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("remote.backend.siri_short_name")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(model.isSiriRemoteConnected
+                             ? localization.text("remote.backend.siri_connected")
+                             : localization.text("remote.backend.siri_disconnected"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.accentColor.opacity(0.65), lineWidth: 1)
+                }
+
+                Image(systemName: "appletvremote.gen4.fill")
+                    .font(.system(size: 68, weight: .regular))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(height: 166)
+
+                VStack(alignment: .leading, spacing: 9) {
+                    connectionStatusLine(
+                        symbol: "antenna.radiowaves.left.and.right",
+                        text: localization.text(
+                            model.isSiriRemoteConnected
+                                ? "remote.backend.siri_connected"
+                                : "remote.backend.siri_disconnected"
+                        ),
+                        tint: model.isSiriRemoteConnected ? .green : .secondary
+                    )
+                    connectionStatusLine(
+                        symbol: batterySymbol(for: model.siriRemoteBatteryLevel),
+                        text: model.siriRemoteBatteryLevel.map {
+                            String(format: localization.text("remote.backend.battery"), $0)
+                        } ?? localization.text("remote.device.battery_unavailable"),
+                        tint: batteryColor(for: model.siriRemoteBatteryLevel)
+                    )
+                    connectionStatusLine(
+                        symbol: "mic.fill",
+                        text: localization.text("remote.backend.siri_voice_fixed_detail"),
+                        tint: .blue
+                    )
+                }
+
+                Button {
+                    model.reconnect()
+                } label: {
+                    Text("connection.action.reconnect")
+                        .foregroundStyle(.white)
+                }
+                .compatibilityButtonStyle(.prominent)
+                .compatibilityRoundedButtonBorderShape(radius: 10)
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -904,13 +987,19 @@ struct SettingsView: View {
                 PageHeader(title: localization.text("button_mapping.page.title"))
                 Toggle("button_mapping.toggle.enabled", isOn: Binding(
                     get: { settings.customMappingEnabled },
-                    set: setCustomMappingEnabled
+                    set: { enabled in setCustomMappingEnabled(enabled) }
                 ))
                 .font(.system(size: 14, weight: .medium))
                 .toggleStyle(.switch)
                 Spacer()
-                remoteDeviceSelector()
-                    .frame(width: 400)
+                Group {
+                    if model.activeBackendKind == .siriRemote {
+                        siriRemoteMappingStatusCard
+                    } else {
+                        remoteDeviceSelector()
+                    }
+                }
+                .frame(width: 400)
             }
             .padding(.horizontal, 22)
             .padding(.top, 18)
@@ -922,21 +1011,29 @@ struct SettingsView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
-                        RemoteMappingCanvas(
-                            selectedButton: $selectedRemoteButton,
-                            activeButtons: model.activeRemoteButtons,
-                            voiceActive: model.isStreaming,
-                            actionSummary: mappingActionSummary,
-                            onEdit: { button, trigger in
-                                selectedRemoteButton = button
-                                isPresetApplicationActionsExpanded = false
-                                mappingEditingTarget = ShortcutEditingTarget(
-                                    button: button,
-                                    trigger: trigger
+                        Group {
+                            if model.activeBackendKind == .siriRemote {
+                                siriRemoteMappingGrid
+                            } else {
+                                RemoteMappingCanvas(
+                                    selectedButton: $selectedRemoteButton,
+                                    activeButtons: model.activeRemoteButtons,
+                                    voiceActive: model.isStreaming,
+                                    actionSummary: mappingActionSummary,
+                                    onEdit: beginMappingEdit
                                 )
                             }
-                        )
+                        }
                         .onReceive(model.$activeRemoteButtons) { buttons in
+                            guard model.activeBackendKind == .xiaomi else { return }
+                            selectedRemoteButton = MappingSelectionPolicy.selection(
+                                current: selectedRemoteButton,
+                                activeButtons: buttons,
+                                isLocked: isMappingSelectionLocked
+                            )
+                        }
+                        .onReceive(model.$activeSiriRemoteButtons) { buttons in
+                            guard model.activeBackendKind == .siriRemote else { return }
                             selectedRemoteButton = MappingSelectionPolicy.selection(
                                 current: selectedRemoteButton,
                                 activeButtons: buttons,
@@ -955,7 +1052,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .compatibilityScrollEdgeEffect()
-                .onChange(of: mappingEditingTarget?.id) { targetID in
+                .onChange(of: mappingEditingTarget?.id) { _, targetID in
                     guard targetID != nil else { return }
                     DispatchQueue.main.async {
                         withAnimation(.easeInOut(duration: 0.25)) {
@@ -964,6 +1061,174 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var siriRemoteMappingGrid: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "appletvremote.gen4.fill")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("remote.backend.siri_mapping_title")
+                        .font(.system(size: 18, weight: .semibold))
+                    Text("remote.backend.siri_mapping_detail")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+                spacing: 10
+            ) {
+                ForEach(
+                    RemoteBackendKind.siriRemote.supportedButtons.filter { $0 != .voice }
+                ) { button in
+                    siriRemoteMappingCard(button)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(model.isStreaming ? Color.orange : Color.secondary)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("remote.button.full.voice")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("remote.backend.siri_voice_fixed_detail")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .padding(18)
+        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var siriRemoteMappingStatusCard: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "apple.logo")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("remote.backend.siri_remote")
+                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(model.isSiriRemoteConnected ? Color.green : Color.secondary)
+                        .frame(width: 8, height: 8)
+                    Text(model.isSiriRemoteConnected
+                         ? localization.text("remote.backend.siri_connected")
+                         : localization.text("remote.backend.siri_disconnected"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    if let battery = model.siriRemoteBatteryLevel {
+                        Text(String(format: localization.text("remote.backend.battery"), battery))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(Color.accentColor)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.accentColor.opacity(0.65), lineWidth: 1)
+        }
+    }
+
+    private func siriRemoteMappingCard(_ button: RemoteButton) -> some View {
+        let isActive = model.activeSiriRemoteButtons.contains(button)
+        let isSelected = selectedRemoteButton == button
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: remoteButtonSymbol(button))
+                    .frame(width: 16)
+                Text(button.displayName(using: localization))
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+            }
+            HStack(spacing: 5) {
+                ForEach(ButtonTrigger.allCases) { trigger in
+                    Button {
+                        beginMappingEdit(button, trigger)
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text(trigger.displayName(using: localization))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text(mappingActionSummary(for: button, trigger: trigger))
+                                .font(.system(size: 12, weight: trigger == .singleClick ? .semibold : .regular))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            isActive
+                ? Color.orange.opacity(0.12)
+                : isSelected
+                    ? Color.accentColor.opacity(0.10)
+                    : Color.primary.opacity(0.035),
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    isActive
+                        ? Color.orange.opacity(0.65)
+                        : isSelected
+                            ? Color.accentColor.opacity(0.45)
+                            : Color.secondary.opacity(0.15)
+                )
+        }
+        .onTapGesture { selectedRemoteButton = button }
+    }
+
+    private func beginMappingEdit(_ button: RemoteButton, _ trigger: ButtonTrigger) {
+        selectedRemoteButton = button
+        isPresetApplicationActionsExpanded = false
+        mappingEditingTarget = ShortcutEditingTarget(button: button, trigger: trigger)
+    }
+
+    private func remoteButtonSymbol(_ button: RemoteButton) -> String {
+        switch button {
+        case .power: return "power"
+        case .up: return "chevron.up"
+        case .left: return "chevron.left"
+        case .ok: return "circle.circle"
+        case .right: return "chevron.right"
+        case .down: return "chevron.down"
+        case .back: return "arrow.uturn.backward"
+        case .volumeUp: return "speaker.plus"
+        case .home: return "house"
+        case .volumeDown: return "speaker.minus"
+        case .menu: return "line.3.horizontal"
+        case .tv: return "tv"
+        case .playPause: return "playpause"
+        case .mute: return "speaker.slash"
+        case .voice: return "mic.fill"
         }
     }
 
@@ -3393,7 +3658,7 @@ private struct UsageBarChart: View {
                     .cornerRadius(5)
                     .annotation(position: .top, spacing: 4) {
                         Text(metric.label(for: point))
-                            .font(.caption2.weight(.medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -3467,7 +3732,7 @@ private struct DeviceStatusStep: View {
                     StatusPill(text: badge, tint: tint)
                 }
                 Text(detail)
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

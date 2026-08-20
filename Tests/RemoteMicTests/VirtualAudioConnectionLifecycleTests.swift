@@ -38,6 +38,38 @@ struct VirtualAudioConnectionLifecycleTests {
         ))
     }
 
+    @Test func siriRemoteConnectionOrActiveVoiceKeepsAudioReadyWithoutXiaomi() {
+        #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 0,
+            siriRemoteReady: true,
+            siriRemoteVoiceActive: false,
+            mobileVoiceActive: false,
+            testToneActive: false
+        ))
+        #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 0,
+            siriRemoteReady: false,
+            siriRemoteVoiceActive: true,
+            mobileVoiceActive: false,
+            testToneActive: false
+        ))
+    }
+
+    @Test func remoteAudioSampleRatePolicySwitchesInBothDirections() {
+        #expect(RemoteAudioFormat.needsReconfiguration(
+            current: RemoteAudioFormat.xiaomiSampleRate,
+            incoming: RemoteAudioFormat.siriRemoteSampleRate
+        ))
+        #expect(RemoteAudioFormat.needsReconfiguration(
+            current: RemoteAudioFormat.siriRemoteSampleRate,
+            incoming: RemoteAudioFormat.xiaomiSampleRate
+        ))
+        #expect(!RemoteAudioFormat.needsReconfiguration(
+            current: RemoteAudioFormat.xiaomiSampleRate,
+            incoming: RemoteAudioFormat.xiaomiSampleRate
+        ))
+    }
+
     @Test func fallbackPrefersBuiltInInputAndExcludesVirtualDevice() {
         let virtual = AudioDeviceInfo(id: 1, uid: "virtual", name: "MiRemoteV 2ch")
         let usb = AudioDeviceInfo(id: 2, uid: "usb", name: "USB Microphone")

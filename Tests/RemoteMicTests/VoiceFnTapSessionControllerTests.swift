@@ -158,6 +158,51 @@ struct VoiceFnTapSessionControllerTests {
             true, false,
         ])
     }
+
+    @Test func preservesFortyEightKilohertzRateAcrossFnPreRoll() {
+        let scheduler = ManualScheduler()
+        var enqueued: [([Int16], Double)] = []
+        let controller = VoiceFnTapSessionController(
+            schedule: scheduler.schedule,
+            setFunctionKeyPressed: { _ in true },
+            enqueueAudioWithSampleRate: { samples, sampleRate in
+                enqueued.append((samples, sampleRate))
+            },
+            drainAudio: { $0() },
+            onFailure: { _ in }
+        )
+        controller.setEnabled(true)
+        #expect(controller.startVoice())
+        #expect(controller.receive([1, 2, 3], sampleRate: RemoteAudioFormat.siriRemoteSampleRate))
+        scheduler.advance(by: 0.27)
+
+        #expect(enqueued.count == 1)
+        #expect(enqueued.first?.0 == [1, 2, 3])
+        #expect(enqueued.first?.1 == RemoteAudioFormat.siriRemoteSampleRate)
+    }
+
+    @Test func sampleRateChangeReplacesIncompatibleFnPreRoll() {
+        let scheduler = ManualScheduler()
+        var enqueued: [([Int16], Double)] = []
+        let controller = VoiceFnTapSessionController(
+            schedule: scheduler.schedule,
+            setFunctionKeyPressed: { _ in true },
+            enqueueAudioWithSampleRate: { samples, sampleRate in
+                enqueued.append((samples, sampleRate))
+            },
+            drainAudio: { $0() },
+            onFailure: { _ in }
+        )
+        controller.setEnabled(true)
+        #expect(controller.startVoice())
+        #expect(controller.receive([48, 48], sampleRate: RemoteAudioFormat.siriRemoteSampleRate))
+        #expect(controller.receive([16, 16], sampleRate: RemoteAudioFormat.xiaomiSampleRate))
+        scheduler.advance(by: 0.27)
+
+        #expect(enqueued.count == 1)
+        #expect(enqueued.first?.0 == [16, 16])
+        #expect(enqueued.first?.1 == RemoteAudioFormat.xiaomiSampleRate)
+    }
 }
 
 private final class Harness {

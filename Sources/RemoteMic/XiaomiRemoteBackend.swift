@@ -15,12 +15,7 @@ final class XiaomiRemoteBackend: RemoteBackend {
     let deviceName = "小米蓝牙遥控器 2 Pro"
 
     /// 小米遥控器的按键集 = 历史 12 键（Siri Remote 新增的 playPause/mute/voice 不出现）
-    let supportedButtons: [RemoteButton] = RemoteButton.allCases.filter {
-        switch $0 {
-        case .playPause, .mute, .voice: return false
-        default: return true
-        }
-    }
+    let supportedButtons = RemoteBackendKind.xiaomi.supportedButtons
 
     private(set) var batteryLevel: Int?
 
@@ -41,7 +36,7 @@ final class XiaomiRemoteBackend: RemoteBackend {
     }
 
     /// ATVV 解码音频转发（16 kHz Int16 → 归一化 Float）
-    func forwardAudio(samples: [Int16], sampleRate: Double = 16_000) {
+    func forwardAudio(samples: [Int16], sampleRate: Double = RemoteAudioFormat.xiaomiSampleRate) {
         guard samples.count > 0 else { return }
         let floats = samples.map { Float($0) / 32768.0 }
         onAudioSamples?(floats, sampleRate)

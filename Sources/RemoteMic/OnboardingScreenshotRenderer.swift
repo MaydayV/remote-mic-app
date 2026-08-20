@@ -127,6 +127,71 @@ enum OnboardingScreenshotRenderer {
         }
     }
 
+    static func renderSiriRemoteSettings(
+        to outputDirectory: URL,
+        appearanceName: String?
+    ) throws {
+        let screenshotAppearance = try ScreenshotAppearance(environmentValue: appearanceName)
+        try FileManager.default.createDirectory(
+            at: outputDirectory,
+            withIntermediateDirectories: true
+        )
+        let suiteName = "RemoteMic.SettingsScreenshot.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            throw RenderingError.bitmapCreationFailed
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = AppSettings(defaults: defaults)
+        settings.applicationLanguage = .simplifiedChinese
+        settings.setActiveBackendKind(.siriRemote)
+        let model = BridgeAppModel(settings: settings)
+        let localization = LocalizationStore(settings: settings)
+        let updateInformation = UpdateInformationStore()
+
+        _ = NSApplication.shared
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = screenshotAppearance.appKitAppearance
+        NSApp.setActivationPolicy(.regular)
+        defer { NSApp.appearance = previousAppearance }
+
+        for (kind, section, filename) in [
+            (RemoteBackendKind.xiaomi, SettingsSection.connection, "01-xiaomi-connection.png"),
+            (RemoteBackendKind.siriRemote, SettingsSection.connection, "02-siri-connection.png"),
+            (RemoteBackendKind.siriRemote, SettingsSection.mapping, "03-siri-mapping.png"),
+        ] {
+            model.setActiveBackend(kind)
+            let rootView = SettingsView(
+                model: model,
+                updateInformation: updateInformation,
+                initialSection: section
+            )
+            .environmentObject(localization)
+            .frame(width: 1020, height: 772)
+            let hostingController = NSHostingController(rootView: rootView)
+            let window = makeWindow(hostingController: hostingController)
+            window.makeKeyAndOrderFront(nil)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            window.contentView?.layoutSubtreeIfNeeded()
+            window.contentView?.displayIfNeeded()
+
+            guard let frameView = window.contentView?.superview else {
+                throw RenderingError.missingFrameView
+            }
+            let bounds = frameView.bounds
+            guard let representation = frameView.bitmapImageRepForCachingDisplay(in: bounds) else {
+                throw RenderingError.bitmapCreationFailed
+            }
+            frameView.cacheDisplay(in: bounds, to: representation)
+            guard let png = representation.representation(using: .png, properties: [:]) else {
+                throw RenderingError.pngCreationFailed
+            }
+            try png.write(to: outputDirectory.appendingPathComponent(filename))
+            window.orderOut(nil)
+            window.contentViewController = nil
+        }
+    }
+
     private static func makeWindow<Content: View>(
         hostingController: NSHostingController<Content>
     ) -> NSWindow {

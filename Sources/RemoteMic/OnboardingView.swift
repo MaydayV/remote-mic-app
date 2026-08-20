@@ -491,7 +491,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                ForEach(RemoteButton.allCases) { button in
+                ForEach(RemoteBackendKind.xiaomi.supportedButtons) { button in
                     let tested = testedControlButtons.contains(button)
                     HStack(spacing: 8) {
                         Image(systemName: tested ? "checkmark.circle.fill" : "circle")

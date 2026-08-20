@@ -579,15 +579,21 @@
 "remote.button.full.mute" = "Mute";
 "remote.button.full.voice" = "Siri Voice";
 "remote.backend.siri_remote" = "Apple Siri Remote (3rd gen · USB-C)";
+"remote.backend.siri_short_name" = "Apple Siri Remote";
 "remote.backend.xiaomi" = "Xiaomi Bluetooth Remote 2 Pro";
 "remote.backend.select.title" = "Connected Device";
 
 
 "remote.backend.siri_detail" = "3rd-gen USB-C remote: navigation, select, back, play/pause, volume, mute and voice.";
 "remote.backend.siri_hint" = "Hold the Siri button to talk, release to end; Clickpad center confirms, edges navigate.";
+"remote.backend.xiaomi_hint" = "Hold the microphone button to talk and release to end; configure other buttons on the Buttons page.";
+"remote.backend.xiaomi_voice_hint" = "Keep the remote connected and select the voice output device above in the target app.";
 "remote.backend.battery" = "Battery %d%%";
-"remote.backend.siri_voice_hint" = "The voice key works with the virtual microphone: select the same audio device in the target app, then hold the Siri button and speak.";
+"remote.backend.siri_voice_hint" = "macOS may expose the buttons without forwarding remote audio. Voice input still requires device verification; button mapping is unaffected.";
 "remote.backend.siri_connected" = "Connected";
 "remote.backend.siri_disconnected" = "Not connected";
+"remote.backend.siri_mapping_title" = "Siri Remote button mapping";
+"remote.backend.siri_mapping_detail" = "Configure single-click, double-click, and long-press actions for every supported physical button.";
+"remote.backend.siri_voice_fixed_detail" = "The Siri button is reserved for push-to-talk and follows the voice-input settings.";
 
 "connection.remote.xiaomi_detail" = "Bluetooth remote with voice input and custom key mapping.";
