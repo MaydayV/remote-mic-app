@@ -87,6 +87,7 @@ struct OnboardingCapabilities: Equatable {
     var voiceSamplesReceived = false
     var voiceSessionEnded = false
     var transcriptionAppeared = false
+    var manualTranscriptInputObserved = false
     var testedRemoteButtonCount = 0
 }
 
@@ -96,6 +97,25 @@ enum OnboardingAudioSelectionPolicy {
         availableUIDs: some Sequence<String>
     ) -> Bool {
         !selectedUID.isEmpty && availableUIDs.contains(selectedUID)
+    }
+}
+
+enum OnboardingTranscriptInputPolicy {
+    private static let keyDownEventTypeRawValue: UInt = 10
+    private static let hidSystemStateRawValue: Int64 = 1
+
+    static func isConfirmedPhysicalKeyboardInput(
+        eventTypeRawValue: UInt?,
+        sourceStateID: Int64?,
+        sourceUnixProcessID: Int64?
+    ) -> Bool {
+        guard eventTypeRawValue == keyDownEventTypeRawValue,
+              sourceStateID == hidSystemStateRawValue,
+              let sourceUnixProcessID,
+              sourceUnixProcessID <= 0 else {
+            return false
+        }
+        return true
     }
 }
 
@@ -130,7 +150,8 @@ enum OnboardingFlowPolicy {
             return capabilities.voiceSessionStarted &&
                 capabilities.voiceSamplesReceived &&
                 capabilities.voiceSessionEnded &&
-                capabilities.transcriptionAppeared
+                capabilities.transcriptionAppeared &&
+                !capabilities.manualTranscriptInputObserved
         case .controls:
             return capabilities.testedRemoteButtonCount >= 3
         case .complete:

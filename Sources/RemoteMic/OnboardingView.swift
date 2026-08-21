@@ -20,6 +20,7 @@ struct OnboardingView: View {
     @State private var voiceSamplesReceived = false
     @State private var voiceSessionEnded = false
     @State private var transcript = ""
+    @State private var manualTranscriptInputObserved = false
     @State private var lastRecordedFailure: FirstUseFailureReason?
     @FocusState private var transcriptFocused: Bool
 
@@ -95,6 +96,10 @@ struct OnboardingView: View {
             guard settings.onboardingStep == .voiceTest else { return }
             if isStreaming {
                 voiceSessionStarted = true
+                voiceSamplesReceived = false
+                voiceSessionEnded = false
+                manualTranscriptInputObserved = false
+                transcript = ""
             } else if voiceSessionStarted {
                 voiceSessionEnded = true
             }
@@ -107,8 +112,20 @@ struct OnboardingView: View {
             prepareForStep(step)
         }
         .onChange(of: transcript) { value in
-            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            guard settings.onboardingStep == .voiceTest,
+                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             transcriptFocused = true
+            let currentEvent = NSApp.currentEvent
+            let currentCGEvent = currentEvent?.cgEvent
+            guard OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+                eventTypeRawValue: currentEvent?.type.rawValue,
+                sourceStateID: currentCGEvent?.getIntegerValueField(.eventSourceStateID),
+                sourceUnixProcessID: currentCGEvent?.getIntegerValueField(
+                    .eventSourceUnixProcessID
+                )
+            ) else { return }
+            manualTranscriptInputObserved = true
+            AppLogger.shared.write("ONBOARDING TRANSCRIPT manual_keyboard_input=true")
         }
         .onChange(of: failureReason) { failure in
             recordFailureTransition(failure)
@@ -941,6 +958,7 @@ struct OnboardingView: View {
             voiceSamplesReceived: voiceSamplesReceived,
             voiceSessionEnded: voiceSessionEnded,
             transcriptionAppeared: transcriptionAppeared,
+            manualTranscriptInputObserved: manualTranscriptInputObserved,
             testedRemoteButtonCount: testedControlButtons.count
         )
     }
@@ -1124,7 +1142,7 @@ struct OnboardingView: View {
             model.refreshAudioDevices()
         case .audioOutputNotReady:
             model.applyAudioSettings(reason: "onboarding_recovery")
-        case .voiceSessionNotStarted, .voiceSessionNotEnded, .voiceNoTranscript:
+        case .voiceSessionNotStarted, .voiceSessionNotEnded, .voiceNoTranscript, .voiceManualInput:
             resetVoiceTestForRetry()
         case .voiceNoSamples:
             model.applyAudioSettings(reason: "onboarding_voice_retry")
@@ -1144,6 +1162,7 @@ struct OnboardingView: View {
         voiceSessionStarted = false
         voiceSamplesReceived = false
         voiceSessionEnded = false
+        manualTranscriptInputObserved = false
         transcript = ""
         DispatchQueue.main.async { transcriptFocused = true }
     }

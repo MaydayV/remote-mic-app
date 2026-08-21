@@ -93,6 +93,18 @@ struct OnboardingFlowTests {
             voiceTool: .typeless,
             capabilities: capabilities
         ))
+        capabilities.manualTranscriptInputObserved = true
+        #expect(!OnboardingFlowPolicy.canContinue(
+            from: .voiceTest,
+            voiceTool: .typeless,
+            capabilities: capabilities
+        ))
+        capabilities.manualTranscriptInputObserved = false
+        #expect(OnboardingFlowPolicy.canContinue(
+            from: .voiceTest,
+            voiceTool: .typeless,
+            capabilities: capabilities
+        ))
 
         capabilities.testedRemoteButtonCount = 2
         #expect(!OnboardingFlowPolicy.canContinue(
@@ -602,4 +614,53 @@ struct OnboardingFlowTests {
         #expect(!text.contains("UUID"))
         #expect(!text.contains("无线麦已经连接成功"))
     }
+    @Test func transcriptInputPolicyRejectsSyntheticAndUnknownEventSources() {
+        #expect(OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 1,
+            sourceUnixProcessID: 0
+        ))
+        #expect(OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 1,
+            sourceUnixProcessID: -1
+        ))
+
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 11,
+            sourceStateID: 1,
+            sourceUnixProcessID: 0
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 0,
+            sourceUnixProcessID: 0
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: -1,
+            sourceUnixProcessID: 0
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 99,
+            sourceUnixProcessID: 0
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 1,
+            sourceUnixProcessID: 42
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: nil,
+            sourceStateID: nil,
+            sourceUnixProcessID: nil
+        ))
+        #expect(!OnboardingTranscriptInputPolicy.isConfirmedPhysicalKeyboardInput(
+            eventTypeRawValue: 10,
+            sourceStateID: 1,
+            sourceUnixProcessID: nil
+        ))
+    }
+
 }

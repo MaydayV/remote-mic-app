@@ -233,19 +233,100 @@ enum CoreAudioDeviceCatalog {
     }
 }
 
+enum SystemAudioSuspensionReason: String, Hashable {
+    case screenSleeping = "screen_sleeping"
+    case sessionInactive = "session_inactive"
+    case systemSleeping = "system_sleeping"
+}
+
+enum SystemAudioLifecycleEvent: String {
+    case screenDidSleep = "screen_did_sleep"
+    case screenDidWake = "screen_did_wake"
+    case sessionDidResignActive = "session_did_resign_active"
+    case sessionDidBecomeActive = "session_did_become_active"
+    case systemWillSleep = "system_will_sleep"
+    case systemDidWake = "system_did_wake"
+
+    var suspensionReason: SystemAudioSuspensionReason {
+        switch self {
+        case .screenDidSleep, .screenDidWake:
+            return .screenSleeping
+        case .sessionDidResignActive, .sessionDidBecomeActive:
+            return .sessionInactive
+        case .systemWillSleep, .systemDidWake:
+            return .systemSleeping
+        }
+    }
+
+    var isSuspending: Bool {
+        switch self {
+        case .screenDidSleep, .sessionDidResignActive, .systemWillSleep:
+            return true
+        case .screenDidWake, .sessionDidBecomeActive, .systemDidWake:
+            return false
+        }
+    }
+}
+
+struct SystemAudioSuspensionState {
+    private(set) var reasons = Set<SystemAudioSuspensionReason>()
+
+    var isSuspended: Bool {
+        !reasons.isEmpty
+    }
+
+    var diagnostic: String {
+        let values = reasons.map(\.rawValue).sorted()
+        return values.isEmpty ? "none" : values.joined(separator: ",")
+    }
+
+    @discardableResult
+    mutating func apply(_ event: SystemAudioLifecycleEvent) -> Bool {
+        if event.isSuspending {
+            return reasons.insert(event.suspensionReason).inserted
+        }
+        return reasons.remove(event.suspensionReason) != nil
+    }
+}
+
 enum VirtualAudioConnectionLifecyclePolicy {
     static func shouldBeActive(
         readyBluetoothBridgeCount: Int,
         siriRemoteReady: Bool = false,
         siriRemoteVoiceActive: Bool = false,
+        bluetoothVoiceActive: Bool = false,
         mobileVoiceActive: Bool,
-        testToneActive: Bool
+        testToneActive: Bool,
+        systemSuspended: Bool = false
     ) -> Bool {
-        readyBluetoothBridgeCount > 0
-            || siriRemoteReady
-            || siriRemoteVoiceActive
-            || mobileVoiceActive
-            || testToneActive
+        if bluetoothVoiceActive || siriRemoteVoiceActive || mobileVoiceActive || testToneActive {
+            return true
+        }
+        let anyBridgeReady = readyBluetoothBridgeCount > 0 || siriRemoteReady
+        return anyBridgeReady && !systemSuspended
+    }
+}
+
+enum VirtualAudioHealthPolicy {
+    static func isPlaybackReady(
+        hasSelectedDevice: Bool,
+        engineRunning: Bool,
+        playerPlaying: Bool
+    ) -> Bool {
+        hasSelectedDevice && engineRunning && playerPlaying
+    }
+
+    static func isConfigurationHealthy(
+        hasSelectedDevice: Bool,
+        engineRunning: Bool,
+        playerPlaying: Bool,
+        boundToSelectedDevice: Bool
+    ) -> Bool {
+        isPlaybackReady(
+            hasSelectedDevice: hasSelectedDevice,
+            engineRunning: engineRunning,
+            playerPlaying: playerPlaying
+        ) && boundToSelectedDevice
     }
 }
 
@@ -400,7 +481,7 @@ final class VirtualAudioOutput {
     }
 
     var isReadyForTestTone: Bool {
-        selectedDevice != nil && engine?.isRunning == true
+        isConfigurationHealthy
     }
 
     /// Schedules the test tone and reports actual playback completion via `scheduleBuffer`'s
@@ -481,7 +562,10 @@ final class VirtualAudioOutput {
                 return false
             }
         }
-        guard let player, engine?.isRunning == true, let buffer = makeBuffer(samples: samples) else {
+        guard isPlaybackReady,
+              let player,
+              let buffer = makeBuffer(samples: samples)
+        else {
             logRejectedWrite()
             return false
         }
@@ -518,7 +602,10 @@ final class VirtualAudioOutput {
                 return false
             }
         }
-        guard let player, engine?.isRunning == true, let buffer = makeBuffer(samples: samples) else {
+        guard isPlaybackReady,
+              let player,
+              let buffer = makeBuffer(samples: samples)
+        else {
             logRejectedWrite()
             return false
         }
@@ -575,6 +662,13 @@ final class VirtualAudioOutput {
         }
     }
 
+    func cancelPendingDrain() {
+        playbackLock.lock()
+        drainCompletion = nil
+        drainGeneration &+= 1
+        playbackLock.unlock()
+    }
+
     private func flushPlayer() {
         playbackLock.lock()
         let interruptedContexts = pendingVoiceBufferCount > 0 ? pendingDrainLogContexts : []
@@ -618,6 +712,7 @@ final class VirtualAudioOutput {
 
     private func scheduledVoiceBufferDidFinish() {
         var completion: (() -> Void)?
+        var completionGeneration: UInt64?
         var drainedContexts: [String] = []
         playbackLock.lock()
         pendingVoiceBufferCount = max(0, pendingVoiceBufferCount - 1)
@@ -626,17 +721,36 @@ final class VirtualAudioOutput {
             pendingDrainLogContexts.removeAll()
             completion = drainCompletion
             drainCompletion = nil
-            drainGeneration &+= 1
+            if completion != nil {
+                completionGeneration = drainGeneration
+            }
         }
         playbackLock.unlock()
         for context in drainedContexts {
             AppLogger.shared.write("AUDIO PLAYBACK drained \(context) pending_buffers=0")
         }
-        guard let completion else { return }
+        guard let completion, let completionGeneration else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.flushPlayer()
-            completion()
+            self?.finishDrainedSessionIfNeeded(
+                generation: completionGeneration,
+                completion: completion
+            )
         }
+    }
+
+    private func finishDrainedSessionIfNeeded(
+        generation: UInt64,
+        completion: @escaping () -> Void
+    ) {
+        playbackLock.lock()
+        let shouldFinish = generation == drainGeneration
+        if shouldFinish {
+            drainGeneration &+= 1
+        }
+        playbackLock.unlock()
+        guard shouldFinish else { return }
+        flushPlayer()
+        completion()
     }
 
     private func finishDrainIfNeeded(generation: UInt64, completion: @escaping () -> Void) {
@@ -666,11 +780,9 @@ final class VirtualAudioOutput {
                   self.engine === engine,
                   self.engineConfigurationGeneration == generation
             else { return }
-            if self.isReadyForTestTone,
-               let selectedDevice = self.selectedDevice,
-               self.currentOutputDevice()?.id == selectedDevice.id {
+            if self.isConfigurationHealthy {
                 AppLogger.shared.write(
-                    "AUDIO ENGINE configuration_ignored generation=\(generation) reason=still_bound"
+                    "AUDIO ENGINE configuration_ignored generation=\(generation) reason=healthy"
                 )
                 return
             }
@@ -701,7 +813,26 @@ final class VirtualAudioOutput {
     }
 
     private func basicDiagnosticState() -> String {
-        "engine_running=\(engine?.isRunning == true) selected={\(CoreAudioDeviceCatalog.deviceDiagnostic(selectedDevice))}"
+        "engine_running=\(engine?.isRunning == true) player_playing=\(player?.isPlaying == true) " +
+            "selected={\(CoreAudioDeviceCatalog.deviceDiagnostic(selectedDevice))}"
+    }
+
+    private var isPlaybackReady: Bool {
+        VirtualAudioHealthPolicy.isPlaybackReady(
+            hasSelectedDevice: selectedDevice != nil,
+            engineRunning: engine?.isRunning == true,
+            playerPlaying: player?.isPlaying == true
+        )
+    }
+
+    private var isConfigurationHealthy: Bool {
+        let actualOutput = currentOutputDevice()
+        return VirtualAudioHealthPolicy.isConfigurationHealthy(
+            hasSelectedDevice: selectedDevice != nil,
+            engineRunning: engine?.isRunning == true,
+            playerPlaying: player?.isPlaying == true,
+            boundToSelectedDevice: selectedDevice?.id == actualOutput?.id
+        )
     }
 
     private func currentOutputDevice() -> AudioDeviceInfo? {
