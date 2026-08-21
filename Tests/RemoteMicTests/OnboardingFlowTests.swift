@@ -663,4 +663,49 @@ struct OnboardingFlowTests {
         ))
     }
 
+    @Test func completedUpdateOpensPermissionRepairOnlyWhenARequiredPermissionIsMissing() throws {
+        #expect(CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: true,
+            completedUpdate: true,
+            bluetoothGranted: false,
+            inputMonitoringGranted: true,
+            accessibilityGranted: true
+        ))
+        #expect(CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: true,
+            completedUpdate: true,
+            bluetoothGranted: true,
+            inputMonitoringGranted: false,
+            accessibilityGranted: true
+        ))
+        #expect(CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: true,
+            completedUpdate: true,
+            bluetoothGranted: true,
+            inputMonitoringGranted: true,
+            accessibilityGranted: false
+        ))
+        #expect(!CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: true,
+            completedUpdate: true,
+            bluetoothGranted: true,
+            inputMonitoringGranted: true,
+            accessibilityGranted: true
+        ))
+        #expect(!CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: false,
+            completedUpdate: true,
+            bluetoothGranted: false,
+            inputMonitoringGranted: false,
+            accessibilityGranted: false
+        ))
+        #expect(!CompletedUpdatePermissionRepairPolicy.shouldOpenPermissions(
+            isOnboardingComplete: true,
+            completedUpdate: false,
+            bluetoothGranted: false,
+            inputMonitoringGranted: false,
+            accessibilityGranted: false
+        ))
+    }
+
 }
