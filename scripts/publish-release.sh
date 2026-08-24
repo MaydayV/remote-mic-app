@@ -8,7 +8,7 @@ PLIST="$ROOT/Resources/Info.plist"
 REPOSITORY="MaydayV/remote-mic-app"
 MODE="${1:-}"
 DRY_RUN="${DRY_RUN:-0}"
-EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-L3QHLDRPAY}"
+EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-34T8V3NA4P}"
 PLIST_VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$PLIST")"
 PLIST_BUILD="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$PLIST")"
 REQUESTED_RELEASE_TAG="${RELEASE_TAG:-}"
@@ -42,7 +42,7 @@ case "$DRY_RUN" in
   0|1) ;;
   *) print -u2 "DRY_RUN must be 0 or 1"; exit 1 ;;
 esac
-if [[ "$EXPECTED_DEVELOPER_TEAM_ID" != "L3QHLDRPAY" ]]; then
+if [[ "$EXPECTED_DEVELOPER_TEAM_ID" != "34T8V3NA4P" ]]; then
   print -u2 "refusing to publish for an unexpected Apple Developer Team"
   exit 1
 fi

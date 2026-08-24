@@ -5,7 +5,7 @@ umask 077
 ROOT="${0:A:h:h}"
 PLIST="$ROOT/Resources/Info.plist"
 REPOSITORY="MaydayV/remote-mic-app"
-EXPECTED_TEAM_ID="L3QHLDRPAY"
+EXPECTED_TEAM_ID="34T8V3NA4P"
 VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$PLIST")"
 BUILD="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$PLIST")"
 RELEASE_TAG="v$VERSION"
