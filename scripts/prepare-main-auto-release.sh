@@ -76,8 +76,8 @@ for locale in zh-Hans en; do
   {
     print "## $version"
     print
-    print "- $first_note"
-    print "- $second_note"
+    print -- "- $first_note"
+    print -- "- $second_note"
     print
     /bin/cat "$history_path"
   } > "$temporary"
