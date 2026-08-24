@@ -13,7 +13,6 @@ SECRETS_REPO="${REMOTEMIC_NOTARY_SECRETS_REPO:-${ROOT:h}/remotemic-notary-secret
 SECRETS_VALIDATOR="$SECRETS_REPO/skills/remotemic-notary-secrets/scripts/validate-notary-secrets-repo.sh"
 ISOLATED_KEYCHAIN_RUNNER="$SECRETS_REPO/run-with-isolated-release-keychain.sh"
 SPARKLE_KEY="${SPARKLE_PRIVATE_KEY_FILE:-$HOME/.config/RemoteMic/sparkle-ed25519.key}"
-PRODUCTION_ENV="$ROOT/Apps/MobileWeb/.private/production.env"
 WORK_DIR="$(/usr/bin/mktemp -d /private/tmp/remotemic-fast-release.XXXXXX)"
 
 cleanup() {
@@ -45,8 +44,7 @@ done
 for required_file in \
   "$SECRETS_VALIDATOR" \
   "$ISOLATED_KEYCHAIN_RUNNER" \
-  "$SPARKLE_KEY" \
-  "$PRODUCTION_ENV"; do
+  "$SPARKLE_KEY"; do
   if [[ ! -r "$required_file" ]]; then
     print -u2 "Required local release file is unavailable: $required_file"
     exit 1

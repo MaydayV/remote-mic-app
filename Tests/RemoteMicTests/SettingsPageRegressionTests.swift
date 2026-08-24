@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Settings page regression")
 struct SettingsPageRegressionTests {
-    @Test func removedPhoneRemoteFeaturesAreAbsentFromTheApp() throws {
+    @Test func removedPhoneAppConnectionIsAbsentFromTheApp() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
