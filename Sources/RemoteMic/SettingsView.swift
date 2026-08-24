@@ -1015,7 +1015,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .compatibilityScrollEdgeEffect()
-                .onChange(of: mappingEditingTarget?.id) { _, targetID in
+                .onChange(of: mappingEditingTarget?.id) { targetID in
                     guard targetID != nil else { return }
                     DispatchQueue.main.async {
                         withAnimation(.easeInOut(duration: 0.25)) {
