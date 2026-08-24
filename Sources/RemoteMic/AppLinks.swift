@@ -6,10 +6,6 @@ enum AppLinks {
     )!
     static let chineseWebsite = URL(string: "https://8586ai.com/")!
     static let englishWebsite = URL(string: "https://8586ai.com/en/")!
-    static let testFlightPublicBeta = URL(
-        string: "https://testflight.apple.com/join/J8k8fb7v"
-    )!
-
     static func website(for locale: Locale) -> URL {
         locale.identifier.lowercased().hasPrefix("zh")
             ? chineseWebsite

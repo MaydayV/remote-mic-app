@@ -33,14 +33,6 @@ if [[ "$RELEASE_TAG" != "v$VERSION" ]]; then
   print -u2 "RELEASE_TAG must match Resources/Info.plist"
   exit 1
 fi
-if [[ "${REMOTE_WEB_RELAY_URL:-}" != wss://?*/ws ]]; then
-  print -u2 "REMOTE_WEB_RELAY_URL must be a production wss:// URL ending in /ws"
-  exit 1
-fi
-if ! print -r -- "${EARLY_ACCESS_SERVICE_URL:-}" | rg -q '^https://[^/?#]+/?$'; then
-  print -u2 "EARLY_ACCESS_SERVICE_URL must be a production root HTTPS URL"
-  exit 1
-fi
 if (( ${#P8_ENCRYPTED_FILES} != 1 )); then
   print -u2 "release credentials repository must contain exactly one AuthKey_*.p8.github-actions.age file"
   exit 1

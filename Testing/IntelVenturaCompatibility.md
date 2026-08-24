@@ -61,8 +61,6 @@ RELEASE_VARIANT=intel ./scripts/verify-dmg.sh
 - `RELEASE_CREDENTIALS_DEPLOY_KEY`
 - `APPLE_SIGNING_MATCH_DEPLOY_KEY`
 - `RELEASE_AGE_IDENTITY`
-- `REMOTE_WEB_RELAY_URL`
-- `EARLY_ACCESS_SERVICE_URL`
 
 其余发布值应放在受保护的 `mac-release` Environment。Developer ID 身份只从只读 Match 仓库同步，P8、Match 密码和 Sparkle 私钥只以 age 密文存在于独立私有凭据仓库；Environment 仅保存专用 age 身份和两把只读部署密钥。解密文件只存在于临时 Runner 与临时 Keychain，不写入源码、缓存或 Actions Artifact。workflow 输出两套独立的已签名、公证、stapled 产物；发布与稳定晋升仍由候选溯源门禁处理。
 

@@ -6,7 +6,6 @@ Chinese website: [8586ai.com](https://8586ai.com/)
 
 English website: [8586ai.com/en](https://8586ai.com/en/)
 
-iOS app beta: [Join the TestFlight public beta](https://testflight.apple.com/join/J8k8fb7v)
 
 ![Remote Mic — a voice remote for Vibe Coding](Screenshots/Remote-Mic-Introduce-1.png)
 
@@ -53,7 +52,7 @@ Remote Mic opens its main window by default on ordinary launches. The **About** 
 
 **App Language** displays **System Default**, **简体中文**, and **English** together. The settings window, status text, menu, and built-in help follow the selection. System permission prompts and third-party panels continue to use the language selected by macOS when they are next opened.
 
-The app checks for updates once per day and asks before installing a newer version; it does not silently download or install updates. **Check for Updates…** is available from both the About page and the right-click menu. **Check for pre-release updates** on the About page is off by default; when enabled, automatic and manual checks also include the latest GitHub pre-release candidate. Sparkle updates the app bundle only; the compatible microphone driver is managed by the installer in the DMG.
+The app checks for stable updates once per day and asks before installing a newer version; it does not silently download or install updates. **Check for Updates…** is available from both the About page and the right-click menu. Sparkle updates the app bundle only; the compatible microphone driver is managed by the installer in the DMG.
 
 ## Use voice input
 
@@ -128,7 +127,7 @@ For development, build, protocol, test, and release details, see the [Technical 
 
 ## License and sources
 
-The macOS app, driver, and related software code in this repository are GPL-3.0-only. The iOS app is now maintained in a separate private repository and continues to be distributed through the TestFlight beta link above. The macOS app logo and app icon are proprietary brand assets that require a separate grant; see [LOGO-LICENSE.en.md](LOGO-LICENSE.en.md). Full copyright and third-party information is available in [COPYRIGHT.en.md](COPYRIGHT.en.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The macOS app, driver, and related software code in this repository are GPL-3.0-only. The macOS app logo and app icon are proprietary brand assets that require a separate grant; see [LOGO-LICENSE.en.md](LOGO-LICENSE.en.md). Full copyright and third-party information is available in [COPYRIGHT.en.md](COPYRIGHT.en.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 The project was originally forked from [nijez/open-voice-bridge](https://github.com/nijez/open-voice-bridge) and is now maintained independently in this repository.
 

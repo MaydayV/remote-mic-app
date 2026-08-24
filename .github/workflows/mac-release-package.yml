@@ -35,8 +35,6 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       EXPECTED_DEVELOPER_TEAM_ID: 34T8V3NA4P
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      REMOTE_WEB_RELAY_URL: ${{ secrets.REMOTE_WEB_RELAY_URL }}
-      EARLY_ACCESS_SERVICE_URL: ${{ secrets.EARLY_ACCESS_SERVICE_URL }}
 
     steps:
       - name: Check out release candidate

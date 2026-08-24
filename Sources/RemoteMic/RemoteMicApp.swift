@@ -7,33 +7,13 @@ import SwiftUI
 
 struct UpdateFeedSelection {
     let stableFeedURLString: String?
-    private(set) var preReleaseFeedURL: URL?
 
     init(stableFeedURLString: String?) {
         self.stableFeedURLString = stableFeedURLString
     }
 
-    mutating func usePreReleaseFeed(_ url: URL) {
-        preReleaseFeedURL = url
-    }
-
-    mutating func useStableFeed() {
-        preReleaseFeedURL = nil
-    }
-
-    func feedURLString(checksForPreReleaseUpdates: Bool) -> String? {
-        if checksForPreReleaseUpdates, let preReleaseFeedURL {
-            return preReleaseFeedURL.absoluteString
-        }
-        return stableFeedURLString
-    }
-
-    var appcastAssetName: String {
-        guard let stableFeedURLString,
-              let name = URL(string: stableFeedURLString)?.lastPathComponent,
-              !name.isEmpty
-        else { return "appcast.xml" }
-        return name
+    func feedURLString() -> String? {
+        stableFeedURLString
     }
 }
 
@@ -92,11 +72,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         case userInitiated
     }
 
-    private static let releasesURL = URL(
-        string: "https://api.github.com/repos/MaydayV/remote-mic-app/releases?per_page=30"
-    )!
-    private static let preReleaseFeedRefreshInterval: TimeInterval = 6 * 60 * 60
-
     private let model = BridgeAppModel()
     private let updateInformation = UpdateInformationStore()
     private lazy var localization = LocalizationStore(settings: model.settings)
@@ -110,8 +85,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     private var updateFeedSelection = UpdateFeedSelection(
         stableFeedURLString: Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
     )
-    private var updateFeedRefreshTask: Task<Void, Never>?
-    private var updateFeedRefreshTimer: Timer?
     private var updaterStarted = false
     private lazy var updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -133,7 +106,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
             currentBuild: currentBuild,
             sparkleHadLaunchedBefore: UserDefaults.standard.bool(forKey: "SUHasLaunchedBefore")
         )
-        observeUpdatePreferences()
         configureUpdater()
         installTerminationSignalHandlers()
         configureApplicationMenu()
@@ -141,7 +113,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         configureStatusItem()
         observeModel()
         observeLocalization()
-        observePhoneRemoteButtonTitles()
         installWorkspaceAudioLifecycleObservers()
         if OnboardingLaunchPolicy.shouldStartRuntime(
             isComplete: model.settings.isOnboardingComplete,
@@ -193,8 +164,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
 
     func applicationWillTerminate(_ notification: Notification) {
         model.stop()
-        updateFeedRefreshTask?.cancel()
-        updateFeedRefreshTimer?.invalidate()
         terminationSignalSources.forEach { $0.cancel() }
         terminationSignalSources.removeAll()
         if let applicationShortcutMonitor {
@@ -441,57 +410,8 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
             .store(in: &subscriptions)
     }
 
-    private func observePhoneRemoteButtonTitles() {
-        Publishers.CombineLatest(
-            Publishers.CombineLatest4(
-                model.settings.$buttonBindings,
-                model.settings.$buttonShortcuts,
-                model.settings.$buttonApplicationProfileIDs,
-                model.settings.$customApplicationProfiles
-            ),
-            localization.$locale
-        )
-        .receive(on: RunLoop.main)
-        .sink { [weak self] values, _ in
-            guard let self else { return }
-            let (bindings, shortcuts, applicationProfileIDs, customApplicationProfiles) = values
-            model.updatePhoneRemoteButtonTitles(
-                bindings: bindings,
-                shortcuts: shortcuts,
-                applicationProfileIDs: applicationProfileIDs,
-                customApplicationProfiles: customApplicationProfiles,
-                localization: localization
-            )
-        }
-        .store(in: &subscriptions)
-    }
-
-    private func observeUpdatePreferences() {
-        model.settings.$checksForPreReleaseUpdates
-            .removeDuplicates()
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] isEnabled in
-                guard let self else { return }
-                updateFeedRefreshTask?.cancel()
-                updateFeedSelection.useStableFeed()
-                updateInformation.reset()
-                configurePreReleaseFeedRefreshTimer(isEnabled: isEnabled)
-                startUpdaterIfNeeded()
-                updaterController.updater.resetUpdateCycleAfterShortDelay()
-                refreshUpdateInformation()
-            }
-            .store(in: &subscriptions)
-    }
-
     private func configureUpdater() {
-        let checksForPreReleaseUpdates = model.settings.checksForPreReleaseUpdates
-        configurePreReleaseFeedRefreshTimer(isEnabled: checksForPreReleaseUpdates)
-        guard checksForPreReleaseUpdates else {
-            startUpdaterIfNeeded()
-            return
-        }
-        refreshPreReleaseFeed(startUpdaterAfterRefresh: true)
+        startUpdaterIfNeeded()
     }
 
     private func startUpdaterIfNeeded() {
@@ -500,76 +420,8 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         updaterStarted = true
     }
 
-    private func configurePreReleaseFeedRefreshTimer(isEnabled: Bool) {
-        updateFeedRefreshTimer?.invalidate()
-        updateFeedRefreshTimer = nil
-        guard isEnabled else { return }
-        updateFeedRefreshTimer = Timer.scheduledTimer(
-            withTimeInterval: Self.preReleaseFeedRefreshInterval,
-            repeats: true
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.refreshPreReleaseFeed(resetUpdateCycleWhenChanged: true)
-            }
-        }
-    }
-
-    private func refreshPreReleaseFeed(
-        startUpdaterAfterRefresh: Bool = false,
-        resetUpdateCycleWhenChanged: Bool = false
-    ) {
-        updateFeedRefreshTask?.cancel()
-        updateFeedRefreshTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                let resolvedURL = try await Self.latestReleaseFeedURL(
-                    assetName: updateFeedSelection.appcastAssetName
-                )
-                guard !Task.isCancelled, model.settings.checksForPreReleaseUpdates else { return }
-                let feedChanged = updateFeedSelection.preReleaseFeedURL != resolvedURL
-                updateFeedSelection.usePreReleaseFeed(resolvedURL)
-                AppLogger.shared.write("UPDATE FEED prerelease_enabled=true resolved=true")
-                if startUpdaterAfterRefresh {
-                    startUpdaterIfNeeded()
-                } else if feedChanged, resetUpdateCycleWhenChanged {
-                    updaterController.updater.resetUpdateCycleAfterShortDelay()
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                let feedChanged = updateFeedSelection.preReleaseFeedURL != nil
-                updateFeedSelection.useStableFeed()
-                AppLogger.shared.write(
-                    "UPDATE FEED prerelease_enabled=true resolved=false fallback=stable "
-                        + "error=\(error.localizedDescription)"
-                )
-                if startUpdaterAfterRefresh {
-                    startUpdaterIfNeeded()
-                } else if feedChanged, resetUpdateCycleWhenChanged {
-                    updaterController.updater.resetUpdateCycleAfterShortDelay()
-                }
-            }
-        }
-    }
-
-    private static func latestReleaseFeedURL(assetName: String) async throws -> URL {
-        var request = URLRequest(url: releasesURL)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 15
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        request.setValue("RemoteMic", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
-            throw UpdateFeedResolutionError.invalidResponse
-        }
-        return try UpdateFeedResolver.latestAppcastURL(from: data, assetName: assetName)
-    }
-
     func feedURLString(for updater: SPUUpdater) -> String? {
-        updateFeedSelection.feedURLString(
-            checksForPreReleaseUpdates: model.settings.checksForPreReleaseUpdates
-        )
+        updateFeedSelection.feedURLString()
     }
 
     private func refreshMenuStatus() {
@@ -708,40 +560,14 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     }
 
     private func performUpdateCheck(_ purpose: UpdateCheckPurpose) {
-        updateFeedRefreshTask?.cancel()
-        updateFeedRefreshTask = Task { [weak self] in
-            guard let self else { return }
-            if model.settings.checksForPreReleaseUpdates {
-                do {
-                    let resolvedURL = try await Self.latestReleaseFeedURL(
-                        assetName: updateFeedSelection.appcastAssetName
-                    )
-                    guard !Task.isCancelled,
-                          model.settings.checksForPreReleaseUpdates
-                    else { return }
-                    updateFeedSelection.usePreReleaseFeed(resolvedURL)
-                    AppLogger.shared.write("UPDATE CHECK prerelease_enabled=true resolved=true")
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    updateFeedSelection.useStableFeed()
-                    AppLogger.shared.write(
-                        "UPDATE CHECK prerelease_enabled=true resolved=false fallback=stable "
-                            + "user_alert=false "
-                            + "error=\(error.localizedDescription)"
-                    )
-                }
-            } else {
-                updateFeedSelection.useStableFeed()
-            }
-            startUpdaterIfNeeded()
-            guard !updaterController.updater.sessionInProgress else { return }
-            switch purpose {
-            case .information:
-                updateInformation.beginChecking()
-                updaterController.updater.checkForUpdateInformation()
-            case .userInitiated:
-                updaterController.checkForUpdates(nil)
-            }
+        startUpdaterIfNeeded()
+        guard !updaterController.updater.sessionInProgress else { return }
+        switch purpose {
+        case .information:
+            updateInformation.beginChecking()
+            updaterController.updater.checkForUpdateInformation()
+        case .userInitiated:
+            updaterController.checkForUpdates(nil)
         }
     }
 

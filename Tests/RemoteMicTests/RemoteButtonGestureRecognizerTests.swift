@@ -119,7 +119,7 @@ struct RemoteButtonGestureRecognizerTests {
         #expect(recognizer.release(.left).isEmpty)
     }
 
-    @Test func phoneButtonPhasesRecognizeDoubleClickForEveryButton() {
+    @Test func remoteButtonPhasesRecognizeDoubleClickForEveryButton() {
         for button in RemoteButton.allCases {
             var recognizer = RemoteButtonGestureRecognizer()
 
@@ -150,7 +150,7 @@ struct RemoteButtonGestureRecognizerTests {
         }
     }
 
-    @Test func phoneButtonPhasesRecognizeLongPressForEveryButton() {
+    @Test func remoteButtonPhasesRecognizeLongPressForEveryButton() {
         for button in RemoteButton.allCases {
             var recognizer = RemoteButtonGestureRecognizer()
 

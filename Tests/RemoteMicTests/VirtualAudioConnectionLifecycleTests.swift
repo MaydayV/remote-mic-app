@@ -7,7 +7,6 @@ struct VirtualAudioConnectionLifecycleTests {
     @Test func lastReadyBluetoothBridgeDisconnectsAndReleasesAudio() {
         #expect(!VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
             readyBluetoothBridgeCount: 0,
-            mobileVoiceActive: false,
             testToneActive: false
         ))
     }
@@ -15,25 +14,17 @@ struct VirtualAudioConnectionLifecycleTests {
     @Test func anotherReadyBluetoothBridgeKeepsAudioActive() {
         #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
             readyBluetoothBridgeCount: 1,
-            mobileVoiceActive: false,
             testToneActive: false
         ))
         #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
             readyBluetoothBridgeCount: 2,
-            mobileVoiceActive: false,
             testToneActive: false
         ))
     }
 
-    @Test func mobileVoiceOrTestToneKeepsAudioActiveWithoutBluetooth() {
+    @Test func testToneKeepsAudioActiveWithoutBluetooth() {
         #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
             readyBluetoothBridgeCount: 0,
-            mobileVoiceActive: true,
-            testToneActive: false
-        ))
-        #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
-            readyBluetoothBridgeCount: 0,
-            mobileVoiceActive: false,
             testToneActive: true
         ))
     }
@@ -43,14 +34,12 @@ struct VirtualAudioConnectionLifecycleTests {
             readyBluetoothBridgeCount: 0,
             siriRemoteReady: true,
             siriRemoteVoiceActive: false,
-            mobileVoiceActive: false,
             testToneActive: false
         ))
         #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
             readyBluetoothBridgeCount: 0,
             siriRemoteReady: false,
             siriRemoteVoiceActive: true,
-            mobileVoiceActive: false,
             testToneActive: false
         ))
     }

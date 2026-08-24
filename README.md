@@ -17,7 +17,6 @@
   </tr>
 </table>
 
-iOS App 公测：[加入 TestFlight 公测](https://testflight.apple.com/join/J8k8fb7v)
 
 ![无线麦——为 Vibe Coding 而生的语音遥控器](Screenshots/Remote-Mic-Introduce-1.png)
 
@@ -66,7 +65,7 @@ Windows 与 Mac 单独构建和发布。当前仅提供面向小米 RC003 的 [W
 
 “应用语言”会完整展示“跟随系统”“简体中文”和“English”三个选项。设置窗口、状态、菜单和内置帮助会随选择刷新；系统权限提示和第三方界面仍会在下次打开时按 macOS 自身的语言显示。
 
-应用每天自动检查一次更新，发现新版本后由用户确认是否安装；不会静默下载或自动安装。“关于”页面和右键菜单中的“检查更新…”均可随时手动检查。“关于”页的“检查预发布版本”默认关闭；开启后，自动检查和手动检查都会包含 GitHub 上最新的 pre-release 候选版本。Sparkle 仅更新应用本体，兼容麦克风驱动仍由 DMG 中的安装包管理。
+应用每天自动检查一次稳定版更新，发现新版本后由用户确认是否安装；不会静默下载或自动安装。“关于”页面和右键菜单中的“检查更新…”均可随时手动检查。Sparkle 仅更新应用本体，兼容麦克风驱动仍由 DMG 中的安装包管理。
 
 ## 使用语音输入
 
@@ -143,7 +142,7 @@ Typeless 等点按 Fn 开始、再次点按结束的语音工具，与 RC003 默
 
 ## 许可与来源
 
-本仓库中的 macOS App、驱动及相关软件代码采用 `GPL-3.0-only` 许可。iOS App 已由独立私有仓库维护，并继续通过上方 TestFlight 公测入口分发。macOS App 的 Logo 和 App Icon 是需要单独授权的专有品牌资产，详情见 [LOGO-LICENSE.md](LOGO-LICENSE.md)。完整版权和第三方信息见 [COPYRIGHT.md](COPYRIGHT.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本仓库中的 macOS App、驱动及相关软件代码采用 `GPL-3.0-only` 许可。macOS App 的 Logo 和 App Icon 是需要单独授权的专有品牌资产，详情见 [LOGO-LICENSE.md](LOGO-LICENSE.md)。完整版权和第三方信息见 [COPYRIGHT.md](COPYRIGHT.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 项目最初 fork 自 [nijez/open-voice-bridge](https://github.com/nijez/open-voice-bridge)，现由本仓库独立维护。
 

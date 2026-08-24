@@ -3,19 +3,14 @@ import Combine
 import CoreAudio
 import Foundation
 
-private enum MobileVoiceSource {
-    case nearby
-    case web
-}
-
-private struct MobileButtonGestureKey: Hashable {
-    let source: UsageEventSource
-    let button: RemoteButton
-}
-
 private struct ManagedDefaultInputTransition {
     let virtualUID: String
     let fallbackUID: String
+}
+
+private struct RemoteButtonGestureKey: Hashable {
+    let source: UsageEventSource
+    let button: RemoteButton
 }
 
 enum BluetoothVoiceStopPolicy {
@@ -49,8 +44,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var isPlayingTestTone = false
     @Published private(set) var isAudioOutputReady = false
     @Published private(set) var currentVoiceSampleCount: UInt64 = 0
-    @Published private(set) var isPhoneRemoteConnectionEnabled = false
-    @Published private(set) var webRemoteState: WebRemoteSessionState = .disabled
     @Published private(set) var voiceShortcutStatus = LocalizedMessage("voice_button.status.preparing")
 
     private let audioOutput = VirtualAudioOutput()
@@ -66,8 +59,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var siriRemoteBatteryLevel: Int?
     /// Siri Remote 是否已连接（后端检测到遥控器 HID 设备）
     @Published private(set) var isSiriRemoteConnected = false
-    private let phoneRemoteServer = PhoneRemoteServer()
-    private let webRemoteClient = WebRemoteRelayClient()
     private let voiceFunctionMapper = RemoteVoiceFunctionMapper()
     private lazy var voiceInputDestinationCoordinator = VoiceInputDestinationCoordinator(
         onStateChange: { [weak self] state in
@@ -94,23 +85,18 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
     )
     private var testToneGeneration = 0
-    private var phoneVoiceFunctionKeyLatch = VoiceFunctionKeyLatch()
     private var voiceSessionStartedAt: Date?
     private var voiceSessionUsageSource: UsageEventSource?
     private var bluetoothVoiceActive = false
     private var siriRemoteVoiceActive = false
     private var loggedBluetoothVoiceAudioDeviceIdentifier: UUID?
-    private var activeMobileVoiceSource: MobileVoiceSource?
     private var longRecordingRequested = false
     private var longRecordingGeneration: UInt64 = 0
     private var longRecordingOpenTimer: DispatchSourceTimer?
     private var longRecordingCloseTimer: DispatchSourceTimer?
-    private var phoneApprovalAlert: NSAlert?
-    private var webApprovalAlert: NSAlert?
-    private var remoteButtonTitles: [String: String] = [:]
-    private var mobileButtonGestureRecognizers: [UsageEventSource: RemoteButtonGestureRecognizer] = [:]
-    private var mobileDoubleClickTimers: [MobileButtonGestureKey: DispatchSourceTimer] = [:]
-    private var mobileLongPressTimers: [MobileButtonGestureKey: DispatchSourceTimer] = [:]
+    private var remoteButtonGestureRecognizers: [UsageEventSource: RemoteButtonGestureRecognizer] = [:]
+    private var remoteButtonDoubleClickTimers: [RemoteButtonGestureKey: DispatchSourceTimer] = [:]
+    private var remoteButtonLongPressTimers: [RemoteButtonGestureKey: DispatchSourceTimer] = [:]
     private var bluetoothBridges: [UUID: XiaomiBluetoothBridge] = [:]
     private var bluetoothBridgeStates: [ObjectIdentifier: BluetoothBridgeState] = [:]
     private var discoveryBluetoothBridge: XiaomiBluetoothBridge?
@@ -158,109 +144,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         audioDevices = initialAudioDevices
         audioOutput.onConfigurationChange = { [weak self] in
             self?.scheduleAudioRecovery(reason: "engine_configuration_change")
-        }
-        phoneRemoteServer.isIdentityTrusted = { [weak self] fingerprint in
-            self?.settings.isPhoneIdentityTrusted(fingerprint) ?? false
-        }
-        phoneRemoteServer.onApprovalCancelled = { [weak self] in
-            self?.cancelPhoneApproval()
-        }
-        phoneRemoteServer.onApprovalRequested = { [weak self] deviceName, pairingCode, fingerprint, completion in
-            guard let self, self.isPhoneRemoteConnectionEnabled else {
-                completion(false)
-                return
-            }
-            requestPhoneApproval(
-                deviceName: deviceName,
-                pairingCode: pairingCode,
-                identityFingerprint: fingerprint,
-                completion: completion
-            )
-        }
-        phoneRemoteServer.onCommand = { [weak self] button, completion in
-            DispatchQueue.main.async {
-                completion(self?.performPhoneCommand(button, source: .nearbyPhone) ?? false)
-            }
-        }
-        phoneRemoteServer.onButtonEvent = { [weak self] button, phase, completion in
-            DispatchQueue.main.async {
-                completion(self?.handleMobileButtonEvent(
-                    button,
-                    phase: phase,
-                    source: .nearbyPhone
-                ) ?? false)
-            }
-        }
-        phoneRemoteServer.onButtonEventsReset = { [weak self] in
-            DispatchQueue.main.async {
-                self?.resetMobileButtonGestures(source: .nearbyPhone)
-            }
-        }
-        phoneRemoteServer.onVoiceStart = { [weak self] completion in
-            DispatchQueue.main.async {
-                completion(self?.startPhoneVoice(source: .nearby) ?? false)
-            }
-        }
-        phoneRemoteServer.onVoiceStop = { [weak self] in
-            DispatchQueue.main.async {
-                self?.stopPhoneVoice(source: .nearby)
-            }
-        }
-        phoneRemoteServer.onAudio = { [weak self] samples in
-            DispatchQueue.main.async {
-                self?.receivePhoneAudio(samples, source: .nearby)
-            }
-        }
-        webRemoteClient.onStateChange = { [weak self] state in
-            self?.webRemoteState = state
-        }
-        webRemoteClient.onApprovalCancelled = { [weak self] in
-            self?.cancelWebApproval()
-        }
-        webRemoteClient.onApprovalRequested = { [weak self] deviceName, pairingCode, completion in
-            guard let self else {
-                completion(false)
-                return
-            }
-            requestWebApproval(
-                deviceName: deviceName,
-                pairingCode: pairingCode,
-                completion: completion
-            )
-        }
-        webRemoteClient.onCommand = { [weak self] button, completion in
-            DispatchQueue.main.async {
-                completion(self?.performPhoneCommand(button, source: .webRemote) ?? false)
-            }
-        }
-        webRemoteClient.onButtonEvent = { [weak self] button, phase, completion in
-            DispatchQueue.main.async {
-                completion(self?.handleMobileButtonEvent(
-                    button,
-                    phase: phase,
-                    source: .webRemote
-                ) ?? false)
-            }
-        }
-        webRemoteClient.onButtonEventsReset = { [weak self] in
-            DispatchQueue.main.async {
-                self?.resetMobileButtonGestures(source: .webRemote)
-            }
-        }
-        webRemoteClient.onVoiceStart = { [weak self] completion in
-            DispatchQueue.main.async {
-                completion(self?.startPhoneVoice(source: .web) ?? false)
-            }
-        }
-        webRemoteClient.onVoiceStop = { [weak self] in
-            DispatchQueue.main.async {
-                self?.stopPhoneVoice(source: .web)
-            }
-        }
-        webRemoteClient.onAudio = { [weak self] samples in
-            DispatchQueue.main.async {
-                self?.receivePhoneAudio(samples, source: .web)
-            }
         }
     }
 
@@ -318,14 +201,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         bluetoothBridgeStates.removeAll()
         discoveryBluetoothBridge = nil
         activeBluetoothVoiceDeviceIdentifier = nil
-        phoneRemoteServer.stop()
-        webRemoteClient.stop()
-        isPhoneRemoteConnectionEnabled = false
-        webRemoteState = .disabled
         bluetoothVoiceActive = false
-        activeMobileVoiceSource = nil
         voiceSessionUsageSource = nil
-        updatePhoneVoiceFunctionKeyState(streaming: false)
         stopHIDMonitors()
         isAudioOutputReady = false
         virtualAudioReleaseGeneration &+= 1
@@ -400,84 +277,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             discoveryBluetoothBridge?.reconnectNow()
         }
         AppLogger.shared.write("BLE DISCOVERY refreshed_from_foreground")
-    }
-
-    func enablePhoneRemoteConnection() {
-        guard started, !isPhoneRemoteConnectionEnabled else { return }
-        isPhoneRemoteConnectionEnabled = true
-        phoneRemoteServer.start()
-        AppLogger.shared.write("PHONE REMOTE enabled_by_user")
-    }
-
-    func disablePhoneRemoteConnection() {
-        guard isPhoneRemoteConnectionEnabled else { return }
-        isPhoneRemoteConnectionEnabled = false
-        cancelPhoneApproval()
-        phoneRemoteServer.stop()
-        AppLogger.shared.write("PHONE REMOTE disabled_by_user")
-    }
-
-    func togglePhoneRemoteConnection() {
-        if isPhoneRemoteConnectionEnabled {
-            disablePhoneRemoteConnection()
-        } else {
-            enablePhoneRemoteConnection()
-        }
-    }
-
-    func enableWebRemoteConnection() {
-        guard started else { return }
-        guard let relayURL = WebRemoteConfiguration.relayURL() else {
-            webRemoteState = .unavailable
-            AppLogger.shared.write("WEB REMOTE unavailable_missing_configuration")
-            return
-        }
-        let version = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String
-        webRemoteState = .connecting
-        webRemoteClient.start(
-            relayURL: relayURL,
-            macName: Host.current().localizedName ?? "Mac",
-            appVersion: version,
-            buttonTitles: remoteButtonTitles
-        )
-        AppLogger.shared.write("WEB REMOTE enabled_by_user")
-    }
-
-    func disableWebRemoteConnection() {
-        webRemoteClient.stop()
-        AppLogger.shared.write("WEB REMOTE disabled_by_user")
-    }
-
-    func updatePhoneRemoteButtonTitles(
-        bindings: [RemoteButton: ButtonAction],
-        shortcuts: [RemoteButton: CustomKeyboardShortcut],
-        applicationProfileIDs: [RemoteButton: UUID] = [:],
-        customApplicationProfiles: [CustomApplicationProfile] = [],
-        localization: LocalizationStore
-    ) {
-        var titles: [String: String] = [:]
-        for button in RemoteButton.allCases {
-            let action = bindings[button] ?? .disabled
-            guard action != AppSettings.defaultBindings[button] else { continue }
-            let fullTitle: String
-            if action == .customShortcut {
-                fullTitle = shortcuts[button]?.displayName(using: localization)
-                    ?? action.displayName(using: localization)
-            } else if action == .openCustomApplication,
-                      let profileID = applicationProfileIDs[button],
-                      let profile = customApplicationProfiles.first(where: { $0.id == profileID })
-            {
-                fullTitle = profile.displayName
-            } else {
-                fullTitle = action.displayName(using: localization)
-            }
-            titles[button.rawValue] = String(fullTitle.prefix(10))
-        }
-        remoteButtonTitles = titles
-        phoneRemoteServer.updateButtonTitles(titles)
-        webRemoteClient.updateButtonTitles(titles)
     }
 
     func refreshAudioDevices() {
@@ -1116,7 +915,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         switch kind {
         case .xiaomi:
             finishSiriRemoteVoice(reason: "backend_switched")
-            resetMobileButtonGestures(source: .siriRemote)
+            resetRemoteButtonGestures(source: .siriRemote)
             activeSiriRemoteButtons.removeAll()
             MainActor.assumeIsolated {
                 siriRemoteBackend.stop()
@@ -1161,7 +960,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             }
             return
         }
-        _ = handleMobileButtonEvent(
+        _ = handleRemoteButtonEvent(
             button,
             phase: isPressed ? .press : .release,
             source: .siriRemote
@@ -1224,7 +1023,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         if !connected {
             activeSiriRemoteButtons.removeAll()
-            resetMobileButtonGestures(source: .siriRemote)
+            resetRemoteButtonGestures(source: .siriRemote)
             finishSiriRemoteVoice(reason: "disconnected")
         }
         guard !isConnected else { return }
@@ -1530,111 +1329,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         connectedRemoteProfileIDs.contains(profileID)
     }
 
-    private func requestPhoneApproval(
-        deviceName: String,
-        pairingCode: String,
-        identityFingerprint: String?,
-        completion: @escaping (Bool) -> Void
-    ) {
-        DispatchQueue.main.async {
-            guard self.isPhoneRemoteConnectionEnabled else {
-                completion(false)
-                return
-            }
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "允许“\(deviceName)”连接无线麦？"
-            alert.informativeText = "这台 iPhone 将连接“无线麦”App，代替实体遥控器发送按键和按住说话音频。请确认 iPhone 上显示的 2 位校验码与下方一致。允许后，本次安装会成为受信任设备。"
-            let codeLabel = NSTextField(labelWithString: pairingCode.map(String.init).joined(separator: " "))
-            codeLabel.frame = NSRect(x: 0, y: 0, width: 300, height: 44)
-            codeLabel.alignment = .center
-            codeLabel.font = .monospacedDigitSystemFont(ofSize: 30, weight: .bold)
-            codeLabel.textColor = .controlAccentColor
-            codeLabel.setAccessibilityLabel("校验码 \(pairingCode)")
-            alert.accessoryView = codeLabel
-            alert.addButton(withTitle: "允许连接")
-            alert.addButton(withTitle: "拒绝")
-            alert.addButton(withTitle: LocalizedMessage("connection.phone.cancel_waiting").text(
-                using: LocalizationStore(settings: self.settings)
-            ))
-            self.phoneApprovalAlert = alert
-            let response = alert.runModal()
-            guard self.phoneApprovalAlert === alert else {
-                completion(false)
-                return
-            }
-            self.phoneApprovalAlert = nil
-            if response == .alertThirdButtonReturn {
-                completion(false)
-                self.disablePhoneRemoteConnection()
-                return
-            }
-            let allowed = response == .alertFirstButtonReturn
-            if allowed, let identityFingerprint {
-                self.settings.trustPhoneIdentity(identityFingerprint)
-            }
-            completion(allowed)
-        }
-    }
-
-    private func cancelPhoneApproval() {
-        DispatchQueue.main.async {
-            guard let alert = self.phoneApprovalAlert else { return }
-            self.phoneApprovalAlert = nil
-            NSApp.abortModal()
-            alert.window.orderOut(nil)
-        }
-    }
-
-    private func requestWebApproval(
-        deviceName: String,
-        pairingCode: String,
-        completion: @escaping (Bool) -> Void
-    ) {
-        DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "允许“\(deviceName)”连接网页版？"
-            alert.informativeText = "手机浏览器将通过一次性会话控制无线麦。请确认手机上显示的 4 位校验码与下方一致。本次允许不会保存为长期受信任设备。"
-            let codeLabel = NSTextField(
-                labelWithString: pairingCode.map(String.init).joined(separator: " ")
-            )
-            codeLabel.frame = NSRect(x: 0, y: 0, width: 300, height: 44)
-            codeLabel.alignment = .center
-            codeLabel.font = .monospacedDigitSystemFont(ofSize: 30, weight: .bold)
-            codeLabel.textColor = .controlAccentColor
-            codeLabel.setAccessibilityLabel("校验码 \(pairingCode)")
-            alert.accessoryView = codeLabel
-            alert.addButton(withTitle: "允许连接")
-            alert.addButton(withTitle: "拒绝")
-            self.webApprovalAlert = alert
-            let allowed = alert.runModal() == .alertFirstButtonReturn
-            guard self.webApprovalAlert === alert else {
-                completion(false)
-                return
-            }
-            self.webApprovalAlert = nil
-            completion(allowed)
-        }
-    }
-
-    private func cancelWebApproval() {
-        DispatchQueue.main.async {
-            guard let alert = self.webApprovalAlert else { return }
-            self.webApprovalAlert = nil
-            NSApp.abortModal()
-            alert.window.orderOut(nil)
-        }
-    }
-
-    private func performPhoneCommand(
-        _ button: RemoteButton,
-        source: UsageEventSource
-    ) -> Bool {
-        performMobileConfiguredAction(for: button, trigger: .singleClick, source: source)
-    }
-
-    private func handleMobileButtonEvent(
+    private func handleRemoteButtonEvent(
         _ button: RemoteButton,
         phase: RemoteButtonPhase,
         source: UsageEventSource
@@ -1648,12 +1343,12 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             trigger: .longPress
         ).action != .disabled
 
-        var recognizer = mobileButtonGestureRecognizers[source] ?? RemoteButtonGestureRecognizer()
+        var recognizer = remoteButtonGestureRecognizers[source] ?? RemoteButtonGestureRecognizer()
         if phase == .press,
            !recognizesDoubleClick,
            !recognizesLongPress,
            !recognizer.isTracking(button) {
-            return performMobileConfiguredAction(
+            return performConfiguredAction(
                 for: button,
                 trigger: .singleClick,
                 source: source
@@ -1666,32 +1361,32 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             recognizesDoubleClick: recognizesDoubleClick,
             recognizesLongPress: recognizesLongPress
         )
-        mobileButtonGestureRecognizers[source] = recognizer
-        return processMobileGestureCommands(commands, source: source)
+        remoteButtonGestureRecognizers[source] = recognizer
+        return processRemoteGestureCommands(commands, source: source)
     }
 
-    private func processMobileGestureCommands(
+    private func processRemoteGestureCommands(
         _ commands: [RemoteButtonGestureRecognizer.Command],
         source: UsageEventSource
     ) -> Bool {
         for command in commands {
             switch command {
             case let .scheduleDoubleClickTimeout(button):
-                scheduleMobileDoubleClickTimeout(for: button, source: source)
+                scheduleRemoteDoubleClickTimeout(for: button, source: source)
             case let .cancelDoubleClickTimeout(button):
-                mobileDoubleClickTimers.removeValue(forKey: .init(
+                remoteButtonDoubleClickTimers.removeValue(forKey: .init(
                     source: source,
                     button: button
                 ))?.cancel()
             case let .scheduleLongPressTimeout(button):
-                scheduleMobileLongPressTimeout(for: button, source: source)
+                scheduleRemoteLongPressTimeout(for: button, source: source)
             case let .cancelLongPressTimeout(button):
-                mobileLongPressTimers.removeValue(forKey: .init(
+                remoteButtonLongPressTimers.removeValue(forKey: .init(
                     source: source,
                     button: button
                 ))?.cancel()
             case let .trigger(button, trigger):
-                guard performMobileConfiguredAction(
+                guard performConfiguredAction(
                     for: button,
                     trigger: trigger,
                     source: source
@@ -1701,59 +1396,57 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         return true
     }
 
-    private func scheduleMobileDoubleClickTimeout(
+    private func scheduleRemoteDoubleClickTimeout(
         for button: RemoteButton,
         source: UsageEventSource
     ) {
-        let key = MobileButtonGestureKey(source: source, button: button)
-        mobileDoubleClickTimers.removeValue(forKey: key)?.cancel()
+        let key = RemoteButtonGestureKey(source: source, button: button)
+        remoteButtonDoubleClickTimers.removeValue(forKey: key)?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + .milliseconds(300))
         timer.setEventHandler { [weak self] in
             guard let self else { return }
-            mobileDoubleClickTimers.removeValue(forKey: key)
-            guard var recognizer = mobileButtonGestureRecognizers[source] else { return }
+            self.remoteButtonDoubleClickTimers.removeValue(forKey: key)
+            guard var recognizer = self.remoteButtonGestureRecognizers[source] else { return }
             let commands = recognizer.doubleClickTimedOut(button)
-            mobileButtonGestureRecognizers[source] = recognizer
-            _ = processMobileGestureCommands(commands, source: source)
+            self.remoteButtonGestureRecognizers[source] = recognizer
+            _ = self.processRemoteGestureCommands(commands, source: source)
         }
-        mobileDoubleClickTimers[key] = timer
+        remoteButtonDoubleClickTimers[key] = timer
         timer.resume()
     }
 
-    private func scheduleMobileLongPressTimeout(
+    private func scheduleRemoteLongPressTimeout(
         for button: RemoteButton,
         source: UsageEventSource
     ) {
-        let key = MobileButtonGestureKey(source: source, button: button)
-        mobileLongPressTimers.removeValue(forKey: key)?.cancel()
+        let key = RemoteButtonGestureKey(source: source, button: button)
+        remoteButtonLongPressTimers.removeValue(forKey: key)?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + .milliseconds(550))
         timer.setEventHandler { [weak self] in
             guard let self else { return }
-            mobileLongPressTimers.removeValue(forKey: key)
-            guard var recognizer = mobileButtonGestureRecognizers[source] else { return }
+            self.remoteButtonLongPressTimers.removeValue(forKey: key)
+            guard var recognizer = self.remoteButtonGestureRecognizers[source] else { return }
             let commands = recognizer.longPressTimedOut(button)
-            mobileButtonGestureRecognizers[source] = recognizer
-            _ = processMobileGestureCommands(commands, source: source)
+            self.remoteButtonGestureRecognizers[source] = recognizer
+            _ = self.processRemoteGestureCommands(commands, source: source)
         }
-        mobileLongPressTimers[key] = timer
+        remoteButtonLongPressTimers[key] = timer
         timer.resume()
     }
 
-    private func resetMobileButtonGestures(source: UsageEventSource) {
-        let doubleClickKeys = mobileDoubleClickTimers.keys.filter { $0.source == source }
-        doubleClickKeys.forEach {
-            mobileDoubleClickTimers.removeValue(forKey: $0)?.cancel()
-        }
-        let longPressKeys = mobileLongPressTimers.keys.filter { $0.source == source }
-        longPressKeys.forEach {
-            mobileLongPressTimers.removeValue(forKey: $0)?.cancel()
-        }
-        mobileButtonGestureRecognizers.removeValue(forKey: source)
+    private func resetRemoteButtonGestures(source: UsageEventSource) {
+        remoteButtonDoubleClickTimers.keys
+            .filter { $0.source == source }
+            .forEach { remoteButtonDoubleClickTimers.removeValue(forKey: $0)?.cancel() }
+        remoteButtonLongPressTimers.keys
+            .filter { $0.source == source }
+            .forEach { remoteButtonLongPressTimers.removeValue(forKey: $0)?.cancel() }
+        remoteButtonGestureRecognizers.removeValue(forKey: source)
     }
 
-    private func performMobileConfiguredAction(
+    private func performConfiguredAction(
         for button: RemoteButton,
         trigger: ButtonTrigger,
         source: UsageEventSource
@@ -1774,9 +1467,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             _ = KeyboardInjector.requestAccessibilityAccess()
             return false
         }
-        guard performExternalConfiguredAction(configured) else {
-            return false
-        }
+        guard performExternalConfiguredAction(configured) else { return false }
         settings.recordButtonPress(control: .remoteButton(button), source: source)
         AppLogger.shared.write(
             "REMOTE BUTTON button=\(button.rawValue) trigger=\(trigger.rawValue) " +
@@ -1837,12 +1528,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         guard isConnected,
               isAudioOutputReady,
-              !bluetoothVoiceActive,
-              activeMobileVoiceSource == nil
+              !bluetoothVoiceActive
         else {
             AppLogger.shared.write(
                 "LONG RECORDING rejected connected=\(isConnected) audio_ready=\(isAudioOutputReady) " +
-                    "bluetooth_voice=\(bluetoothVoiceActive) mobile_voice=\(activeMobileVoiceSource != nil)"
+                    "bluetooth_voice=\(bluetoothVoiceActive)"
             )
             return false
         }
@@ -1923,32 +1613,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         longRecordingCloseTimer = nil
     }
 
-    private func startPhoneVoice(source: MobileVoiceSource) -> Bool {
-        guard activeMobileVoiceSource == nil else { return false }
-        guard isAudioOutputReady || configureVirtualAudioOutput(reason: "mobile_voice_start") else {
-            releaseVirtualAudioOutputIfUnused(reason: "mobile_voice_configure_failed")
-            return false
-        }
-        guard updatePhoneVoiceFunctionKeyState(streaming: true) else {
-            releaseVirtualAudioOutputIfUnused(reason: "mobile_voice_function_key_failed")
-            return false
-        }
-        activeMobileVoiceSource = source
-        beginVoiceSessionIfNeeded()
-        return true
-    }
-
-    private func stopPhoneVoice(source: MobileVoiceSource) {
-        guard activeMobileVoiceSource == source else { return }
-        audioOutput.endSessionAfterDraining { [weak self] in
-            guard let self, self.activeMobileVoiceSource == source else { return }
-            self.activeMobileVoiceSource = nil
-            self.updatePhoneVoiceFunctionKeyState(streaming: false)
-            self.endVoiceSessionIfNeeded()
-            self.releaseVirtualAudioOutputIfUnused(reason: "mobile_voice_stopped")
-        }
-    }
-
     private var readyBluetoothBridgeCount: Int {
         bluetoothBridgeStates.values.reduce(into: 0) { count, state in
             if case .ready = state {
@@ -1963,15 +1627,13 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             siriRemoteReady: activeBackendKind == .siriRemote && isSiriRemoteConnected,
             siriRemoteVoiceActive: siriRemoteVoiceActive,
             bluetoothVoiceActive: bluetoothVoiceActive,
-            mobileVoiceActive: activeMobileVoiceSource != nil,
             testToneActive: isPlayingTestTone,
             systemSuspended: systemAudioSuspensionState.isSuspended
         )
     }
 
     private var hasActiveVirtualAudioSource: Bool {
-        bluetoothVoiceActive || activeMobileVoiceSource != nil || isPlayingTestTone
-            || siriRemoteVoiceActive
+        bluetoothVoiceActive || isPlayingTestTone || siriRemoteVoiceActive
     }
 
     private func resumeVirtualAudioOutputIfNeeded(reason: String) {
@@ -2011,7 +1673,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 "reasons=\(systemAudioSuspensionState.diagnostic) started=\(started) " +
                 "ready_bridges=\(readyBluetoothBridgeCount) " +
                 "bluetooth_voice=\(bluetoothVoiceActive) " +
-                "mobile_voice=\(activeMobileVoiceSource != nil) " +
                 "test_tone=\(isPlayingTestTone) audio_ready=\(isAudioOutputReady)"
         )
         guard started, changed else { return }
@@ -2028,7 +1689,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 AppLogger.shared.write(
                     "SYSTEM AUDIO suspend_deferred event=\(event.rawValue) " +
                         "bluetooth_voice=\(bluetoothVoiceActive) " +
-                        "mobile_voice=\(activeMobileVoiceSource != nil) " +
                         "test_tone=\(isPlayingTestTone)"
                 )
                 return
@@ -2058,7 +1718,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 "AUDIO RELEASE skipped reason=\(reason) still_required=true " +
                     "system_suspended=\(systemAudioSuspensionState.isSuspended) " +
                     "bluetooth_voice=\(bluetoothVoiceActive) " +
-                    "mobile_voice=\(activeMobileVoiceSource != nil) test_tone=\(isPlayingTestTone)"
+                    "test_tone=\(isPlayingTestTone)"
             )
             return
         }
@@ -2084,7 +1744,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                     "AUDIO RELEASE cancelled reason=\(reason) generation=\(generation) " +
                         "cause=required_again system_suspended=\(self.systemAudioSuspensionState.isSuspended) " +
                         "bluetooth_voice=\(self.bluetoothVoiceActive) " +
-                        "mobile_voice=\(self.activeMobileVoiceSource != nil) " +
                         "test_tone=\(self.isPlayingTestTone)"
                 )
                 return
@@ -2116,7 +1775,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 "trigger=\(trigger) system_suspended=\(systemAudioSuspensionState.isSuspended) " +
                 "ready_bridges=\(readyBluetoothBridgeCount) " +
                 "bluetooth_voice=\(bluetoothVoiceActive) " +
-                "mobile_voice=\(activeMobileVoiceSource != nil) test_tone=\(isPlayingTestTone)"
+                "test_tone=\(isPlayingTestTone)"
         )
     }
 
@@ -2184,11 +1843,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
     }
 
-    private func receivePhoneAudio(_ samples: [Int16], source: MobileVoiceSource) {
-        guard activeMobileVoiceSource == source else { return }
-        audioOutput.enqueue(samples: samples)
-    }
-
     private func beginVoiceSessionIfNeeded() {
         guard !isStreaming else { return }
         cancelTestToneIfNeeded(
@@ -2206,7 +1860,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private func endVoiceSessionIfNeeded(flushAudio: Bool = true) {
         guard !bluetoothVoiceActive,
               !siriRemoteVoiceActive,
-              activeMobileVoiceSource == nil,
               isStreaming
         else { return }
         if let voiceSessionStartedAt {
@@ -2229,11 +1882,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private var currentVoiceUsageSource: UsageEventSource {
         if bluetoothVoiceActive { return .bluetoothRemote }
         if siriRemoteVoiceActive { return .siriRemote }
-        switch activeMobileVoiceSource {
-        case .nearby: return .nearbyPhone
-        case .web: return .webRemote
-        case nil: return .unknown
-        }
+        return .unknown
     }
 
     @discardableResult
@@ -2251,26 +1900,4 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         return !settings.customMappingEnabled || voiceFunctionMapper.isPowerKeySuppressed
     }
 
-    @discardableResult
-    private func updatePhoneVoiceFunctionKeyState(streaming: Bool) -> Bool {
-        guard let transition = phoneVoiceFunctionKeyLatch.transition(streaming: streaming) else {
-            return true
-        }
-        let shouldHold = transition == .press
-        guard KeyboardInjector.setFunctionKeyPressed(shouldHold) else {
-            phoneVoiceFunctionKeyLatch.rollback(transition)
-            AppLogger.shared.write(
-                "PHONE VOICE FN \(shouldHold ? "DOWN" : "UP") failed"
-            )
-            return false
-        }
-        isVoiceTriggerEnabled = !shouldHold
-        voiceShortcutStatus = LocalizedMessage(
-            shouldHold ? "voice_button.status.fn_pressed" : "voice_button.status.fn_released"
-        )
-        AppLogger.shared.write(
-            "PHONE VOICE FN \(shouldHold ? "DOWN" : "UP")"
-        )
-        return true
-    }
 }

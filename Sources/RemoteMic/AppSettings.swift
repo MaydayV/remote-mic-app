@@ -19,7 +19,6 @@ private struct PersonalizedConfiguration: Codable {
     let applicationLanguage: AppLanguage
     let showDockIcon: Bool
     let openMainWindowAtLaunch: Bool?
-    let checksForPreReleaseUpdates: Bool?
     let experimentalContinuousRecordingEnabled: Bool?
     let voiceFnTapModeEnabled: Bool?
     let continuousRecordingPowerBindingBackup: ConfiguredButtonAction?
@@ -52,8 +51,6 @@ struct WeeklyUsageStatisticsSeries: Equatable {
 
 enum UsageEventSource: String, Codable, CaseIterable, Hashable {
     case bluetoothRemote = "bluetooth_remote"
-    case nearbyPhone = "nearby_phone"
-    case webRemote = "web_remote"
     case siriRemote = "siri_remote"
     case unknown
 }
@@ -240,7 +237,6 @@ final class AppSettings: ObservableObject {
         static let applicationLanguage = "applicationLanguage"
         static let showDockIcon = "showDockIcon"
         static let openMainWindowAtLaunch = "openMainWindowAtLaunch"
-        static let checksForPreReleaseUpdates = "checksForPreReleaseUpdates"
         static let experimentalContinuousRecordingEnabled = "experimentalContinuousRecordingEnabled"
         static let voiceFnTapModeEnabled = "voiceFnTapModeEnabled"
         static let continuousRecordingPowerBindingBackup = "continuousRecordingPowerBindingBackup"
@@ -249,7 +245,6 @@ final class AppSettings: ObservableObject {
         static let totalVoiceDuration = "usage.totalVoiceDuration"
         static let dailyStatistics = "usage.dailyStatistics"
         static let voiceSessionRanking = "usage.voiceSessionRanking"
-        static let trustedPhoneIdentityFingerprints = "security.trustedPhoneIdentityFingerprints"
         static let onboardingCompletedVersion = "onboarding.completedVersion"
         static let onboardingStep = "onboarding.step"
         static let onboardingVoiceTool = "onboarding.voiceTool"
@@ -325,12 +320,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(openMainWindowAtLaunch, forKey: Keys.openMainWindowAtLaunch) }
     }
 
-    @Published var checksForPreReleaseUpdates: Bool {
-        didSet {
-            defaults.set(checksForPreReleaseUpdates, forKey: Keys.checksForPreReleaseUpdates)
-        }
-    }
-
     @Published private(set) var experimentalContinuousRecordingEnabled: Bool {
         didSet {
             defaults.set(
@@ -385,15 +374,6 @@ final class AppSettings: ObservableObject {
     @Published private(set) var activeBackendKindRawValue: String {
         didSet {
             defaults.set(activeBackendKindRawValue, forKey: Keys.activeBackendKind)
-        }
-    }
-
-    @Published private(set) var trustedPhoneIdentityFingerprints: Set<String> {
-        didSet {
-            defaults.set(
-                trustedPhoneIdentityFingerprints.sorted(),
-                forKey: Keys.trustedPhoneIdentityFingerprints
-            )
         }
     }
 
@@ -508,7 +488,6 @@ final class AppSettings: ObservableObject {
         openMainWindowAtLaunch = defaults.object(forKey: Keys.openMainWindowAtLaunch) == nil
             ? true
             : defaults.bool(forKey: Keys.openMainWindowAtLaunch)
-        checksForPreReleaseUpdates = defaults.bool(forKey: Keys.checksForPreReleaseUpdates)
         experimentalContinuousRecordingEnabled = defaults.bool(
             forKey: Keys.experimentalContinuousRecordingEnabled
         )
@@ -534,9 +513,6 @@ final class AppSettings: ObservableObject {
         )
         activeBackendKindRawValue = defaults.string(forKey: Keys.activeBackendKind)
             ?? RemoteBackendKind.default.rawValue
-        trustedPhoneIdentityFingerprints = Set(
-            defaults.stringArray(forKey: Keys.trustedPhoneIdentityFingerprints) ?? []
-        )
         onboardingCompletedVersion = defaults.integer(forKey: Keys.onboardingCompletedVersion)
         onboardingStep = defaults.string(forKey: Keys.onboardingStep)
             .flatMap(OnboardingStep.init(rawValue:))
@@ -1158,19 +1134,6 @@ final class AppSettings: ObservableObject {
         activeBackendKindRawValue = kind.rawValue
     }
 
-    func isPhoneIdentityTrusted(_ fingerprint: String) -> Bool {
-        trustedPhoneIdentityFingerprints.contains(fingerprint)
-    }
-
-    func trustPhoneIdentity(_ fingerprint: String) {
-        guard !fingerprint.isEmpty else { return }
-        trustedPhoneIdentityFingerprints.insert(fingerprint)
-    }
-
-    func clearTrustedPhoneIdentities() {
-        trustedPhoneIdentityFingerprints.removeAll()
-    }
-
     func recordLaunchAndDetectCompletedUpdate(
         currentBuild: String,
         sparkleHadLaunchedBefore: Bool
@@ -1230,7 +1193,6 @@ final class AppSettings: ObservableObject {
             applicationLanguage: applicationLanguage,
             showDockIcon: showDockIcon,
             openMainWindowAtLaunch: openMainWindowAtLaunch,
-            checksForPreReleaseUpdates: checksForPreReleaseUpdates,
             experimentalContinuousRecordingEnabled: experimentalContinuousRecordingEnabled,
             voiceFnTapModeEnabled: voiceFnTapModeEnabled,
             continuousRecordingPowerBindingBackup: continuousRecordingPowerBindingBackup
@@ -1289,9 +1251,6 @@ final class AppSettings: ObservableObject {
         showDockIcon = configuration.showDockIcon
         if let openMainWindowAtLaunch = configuration.openMainWindowAtLaunch {
             self.openMainWindowAtLaunch = openMainWindowAtLaunch
-        }
-        if let checksForPreReleaseUpdates = configuration.checksForPreReleaseUpdates {
-            self.checksForPreReleaseUpdates = checksForPreReleaseUpdates
         }
         voiceFnTapModeEnabled = configuration.voiceFnTapModeEnabled ?? false
         applyContinuousRecordingExperimentState(

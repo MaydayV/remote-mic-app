@@ -192,11 +192,8 @@ struct OnboardingFlowTests {
             encoding: .utf8
         )
         let reconnectStart = try #require(modelSource.range(of: "func reconnect()"))
-        let reconnectEnd = try #require(modelSource.range(
-            of: "func enablePhoneRemoteConnection()",
-            range: reconnectStart.upperBound..<modelSource.endIndex
-        ))
-        let reconnectSource = modelSource[reconnectStart.lowerBound..<reconnectEnd.lowerBound]
+        let reconnectEnd = modelSource.endIndex
+        let reconnectSource = modelSource[reconnectStart.lowerBound..<reconnectEnd]
         #expect(reconnectSource.contains("guard started else { return }"))
         #expect(reconnectSource.contains("bluetoothBridges.isEmpty && discoveryBluetoothBridge == nil"))
         #expect(reconnectSource.contains("startBluetoothConnections()"))
@@ -227,11 +224,8 @@ struct OnboardingFlowTests {
             encoding: .utf8
         )
         let refreshStart = try #require(modelSource.range(of: "func refreshRemoteDiscovery()"))
-        let refreshEnd = try #require(modelSource.range(
-            of: "func enablePhoneRemoteConnection()",
-            range: refreshStart.upperBound..<modelSource.endIndex
-        ))
-        let refreshSource = modelSource[refreshStart.lowerBound..<refreshEnd.lowerBound]
+        let refreshEnd = modelSource.endIndex
+        let refreshSource = modelSource[refreshStart.lowerBound..<refreshEnd]
         #expect(refreshSource.contains("discoveryBluetoothBridge?.reconnectNow()"))
     }
 
@@ -378,7 +372,6 @@ struct OnboardingFlowTests {
         completed.customMappingEnabled = true
         completed.showDockIcon = false
         completed.openMainWindowAtLaunch = false
-        completed.checksForPreReleaseUpdates = true
         completed.setAction(.escape, for: .ok)
 
         completed.restartOnboarding()
@@ -390,7 +383,6 @@ struct OnboardingFlowTests {
         #expect(restarted.customMappingEnabled)
         #expect(!restarted.showDockIcon)
         #expect(!restarted.openMainWindowAtLaunch)
-        #expect(restarted.checksForPreReleaseUpdates)
         #expect(restarted.action(for: .ok) == .escape)
     }
 

@@ -27,7 +27,6 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-RemoteMic-notary}"
 NOTARY_KEYCHAIN="${NOTARY_KEYCHAIN:-}"
 EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-34T8V3NA4P}"
 PARALLEL_PACKAGE_NOTARIZATION="${PARALLEL_PACKAGE_NOTARIZATION:-0}"
-PRIVATE_PRODUCTION_ENV="$ROOT/Apps/MobileWeb/.private/production.env"
 CDN_DOWNLOAD_PREFIX="${RELEASE_DOWNLOAD_PREFIX:-https://download.sayall.app/mac/releases/$RELEASE_TAG/}"
 RELEASE_PAGE="${RELEASE_PAGE_URL:-https://github.com/MaydayV/remote-mic-app/releases/tag/$RELEASE_TAG}"
 GENERATE_APPCAST="$ROOT/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
@@ -63,22 +62,6 @@ if [[ "$INSTALLER_SIGNING_IDENTITY" != "Developer ID Installer: "* ]]; then
 fi
 if [[ "$GENERATE_SPARKLE_UPDATE" == "1" && ! -r "$SPARKLE_PRIVATE_KEY_FILE" ]]; then
   print -u2 "SPARKLE_PRIVATE_KEY_FILE is not readable"
-  exit 1
-fi
-if [[ -z "${REMOTE_WEB_RELAY_URL:-}" && -r "$PRIVATE_PRODUCTION_ENV" ]]; then
-  REMOTE_WEB_RELAY_URL="$(/usr/bin/sed -n 's/^REMOTE_WEB_RELAY_URL=//p' \
-    "$PRIVATE_PRODUCTION_ENV" | /usr/bin/tail -n 1)"
-fi
-if [[ -z "${EARLY_ACCESS_SERVICE_URL:-}" && -r "$PRIVATE_PRODUCTION_ENV" ]]; then
-  EARLY_ACCESS_SERVICE_URL="$(/usr/bin/sed -n 's/^EARLY_ACCESS_SERVICE_URL=//p' \
-    "$PRIVATE_PRODUCTION_ENV" | /usr/bin/tail -n 1)"
-fi
-if [[ "${REMOTE_WEB_RELAY_URL:-}" != wss://?*/ws ]]; then
-  print -u2 "REMOTE_WEB_RELAY_URL must be a production wss:// URL ending in /ws"
-  exit 1
-fi
-if ! print -r -- "${EARLY_ACCESS_SERVICE_URL:-}" | rg -q '^https://[^/?#]+/?$'; then
-  print -u2 "EARLY_ACCESS_SERVICE_URL must be a production root HTTPS URL"
   exit 1
 fi
 for command in codesign ditto security xcrun; do
@@ -148,10 +131,6 @@ export CODE_SIGN_IDENTITY
 export INSTALLER_SIGNING_IDENTITY
 export EXPECTED_DEVELOPER_TEAM_ID
 export REQUIRE_DEVELOPER_ID_SIGNING=1
-export REQUIRE_WEB_REMOTE_CONFIGURATION=1
-export REQUIRE_EARLY_ACCESS_CONFIGURATION=1
-export REMOTE_WEB_RELAY_URL
-export EARLY_ACCESS_SERVICE_URL
 export REQUIRE_NOTARIZATION=0
 
 "$ROOT/scripts/build-app.sh"

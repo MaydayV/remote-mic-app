@@ -34,32 +34,6 @@ struct BuildSigningTests {
         #expect(!adHocSigningSource.contains("--options runtime"))
     }
 
-    @Test func productionReleaseRequiresAndVerifiesWebRemoteConfiguration() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let buildSource = try String(
-            contentsOf: root.appendingPathComponent("scripts/build-app.sh"),
-            encoding: .utf8
-        )
-        let notarizeSource = try String(
-            contentsOf: root.appendingPathComponent("scripts/notarize-release.sh"),
-            encoding: .utf8
-        )
-        let verifySource = try String(
-            contentsOf: root.appendingPathComponent("scripts/verify-app.sh"),
-            encoding: .utf8
-        )
-
-        #expect(buildSource.contains("REQUIRE_WEB_REMOTE_CONFIGURATION"))
-        #expect(buildSource.contains("A production wss:// relay URL ending in /ws is required"))
-        #expect(notarizeSource.contains("Apps/MobileWeb/.private/production.env"))
-        #expect(notarizeSource.contains("export REQUIRE_WEB_REMOTE_CONFIGURATION=1"))
-        #expect(notarizeSource.contains("export REMOTE_WEB_RELAY_URL"))
-        #expect(verifySource.contains("Developer ID app is missing a production Web Remote relay URL"))
-    }
-
     @Test func productionReleaseDoesNotRequirePrivateFeaturePackage() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -88,7 +62,7 @@ struct BuildSigningTests {
         #expect(!verifySource.contains("SayAllAI"))
     }
 
-    @Test func unavailablePreReleaseFeedDoesNotPresentACustomErrorAlert() throws {
+    @Test func clientUsesOnlyTheStableUpdateFeed() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -98,9 +72,9 @@ struct BuildSigningTests {
             encoding: .utf8
         )
 
-        #expect(source.contains("resolved=false fallback=stable"))
-        #expect(source.contains("user_alert=false"))
-        #expect(!source.contains("showPreReleaseFeedUnavailableAlert"))
+        #expect(source.contains("func feedURLString() -> String?"))
+        #expect(!source.contains("preReleaseFeed"))
+        #expect(!source.contains("latestReleaseFeedURL"))
     }
 
     @Test func fastReleaseKeepsMandatorySafetyGates() throws {

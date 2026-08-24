@@ -157,16 +157,8 @@ struct SettingsView: View {
     @State private var accessibilityGranted = KeyboardInjector.isAccessibilityTrusted
     @State private var configurationStatus: ConfigurationStatus?
     @State private var isReleaseHistoryPresented = false
-    @State private var isClearTrustedPhonesConfirmationPresented = false
-    @State private var isWebRemoteSessionPresented = false
-    @State private var isWebRemoteInvitePresented = false
-    @State private var isWebRemoteInviteInvalidPresented = false
-    @State private var isWebRemoteInviteAuthorized = false
-    @State private var isTestFlightLinkCopied = false
     @State private var isMappingPermissionAlertPresented = false
     @State private var isWaitingForMappingPermissions = false
-    @State private var webRemoteInviteCode = ""
-    private static let requiredWebRemoteInviteCode = "8586"
 
     init(
         model: BridgeAppModel,
@@ -206,40 +198,6 @@ struct SettingsView: View {
         .sheet(isPresented: $isReleaseHistoryPresented) {
             ReleaseHistorySheet()
         }
-        .sheet(isPresented: $isWebRemoteSessionPresented) {
-            WebRemoteSessionView(model: model)
-                .environmentObject(localization)
-        }
-        .alert(
-            localization.text("connection.trusted_devices.clear_confirm.title"),
-            isPresented: $isClearTrustedPhonesConfirmationPresented
-        ) {
-            Button(
-                localization.text("connection.trusted_devices.clear"),
-                role: .destructive
-            ) {
-                settings.clearTrustedPhoneIdentities()
-            }
-            Button(localization.text("common.action.cancel"), role: .cancel) {}
-        } message: {
-            Text("connection.trusted_devices.clear_confirm.message")
-        }
-        .sheet(isPresented: $isWebRemoteInvitePresented) {
-            if isWebRemoteInviteAuthorized {
-                WebRemoteSessionView(model: model)
-                    .environmentObject(localization)
-            } else {
-                webRemoteInviteSheet
-            }
-        }
-        .alert(
-            localization.text("connection.web.invite.invalid_title"),
-            isPresented: $isWebRemoteInviteInvalidPresented
-        ) {
-            Button(localization.text("common.action.ok")) {}
-        } message: {
-            Text("connection.web.invite.invalid_message")
-        }
         .alert(
             localization.text("button_mapping.permission_prompt.title"),
             isPresented: $isMappingPermissionAlertPresented
@@ -256,95 +214,6 @@ struct SettingsView: View {
         } message: {
             Text("button_mapping.permission_prompt.message")
         }
-    }
-
-    private var webRemoteInviteSheet: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "iphone")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 52, height: 52)
-                        .background(Color.accentColor.opacity(0.14), in: Circle())
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("connection.web.invite.ios_eyebrow")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.accentColor)
-                        Text("connection.web.invite.ios_title")
-                            .font(.title3.weight(.semibold))
-                        Text("connection.web.invite.ios_description")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Link(destination: AppLinks.testFlightPublicBeta) {
-                        Label("connection.web.invite.testflight_open", systemImage: "arrow.up.right.square")
-                    }
-                    .compatibilityButtonStyle(.prominent)
-
-                    Button {
-                        copyTestFlightPublicBetaLink()
-                    } label: {
-                        Label(
-                            localization.text(
-                                isTestFlightLinkCopied
-                                    ? "common.status.copied"
-                                    : "common.action.copy_link"
-                            ),
-                            systemImage: isTestFlightLinkCopied ? "checkmark" : "doc.on.doc"
-                        )
-                    }
-                    .compatibilityButtonStyle(.standard)
-                }
-            }
-            .padding(18)
-            .background(
-                Color.accentColor.opacity(0.10),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.28), lineWidth: 1)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("connection.web.invite.title")
-                    .font(.headline)
-                Text("connection.web.invite.description")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            TextField(
-                localization.text("connection.web.invite.placeholder"),
-                text: $webRemoteInviteCode
-            )
-            .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Spacer()
-                Button("common.action.cancel") {
-                    webRemoteInviteCode = ""
-                    isWebRemoteInvitePresented = false
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button("connection.web.invite.unlock") {
-                    validateWebRemoteInviteCode()
-                }
-                .compatibilityButtonStyle(.prominent)
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(width: 540)
     }
 
     private var sidebar: some View {
@@ -444,7 +313,6 @@ struct SettingsView: View {
                     VStack(spacing: 14) {
                         audioSettingsPanel
                         audioCompatibilityPanel
-                        phoneConnectionsPanel
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
@@ -565,132 +433,6 @@ struct SettingsView: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    private var phoneConnectionsPanel: some View {
-        GlassPanel {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("connection.phone.section_title")
-                    .font(.headline)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "iphone")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 34)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
-                                Text("connection.phone.ios_title")
-                                    .font(.subheadline.weight(.semibold))
-                                Text("connection.phone.no_invite_badge")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text("connection.phone.ios_help")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer(minLength: 8)
-
-                        StatusPill(
-                            text: localization.text(
-                                model.isPhoneRemoteConnectionEnabled
-                                    ? "connection.phone.enabled"
-                                    : "connection.phone.not_enabled"
-                            ),
-                            tint: model.isPhoneRemoteConnectionEnabled ? .orange : .secondary
-                        )
-                    }
-
-                    HStack(spacing: 8) {
-                        Button(
-                            model.isPhoneRemoteConnectionEnabled
-                                ? "connection.phone.cancel_waiting"
-                                : "connection.phone.connect"
-                        ) {
-                            model.togglePhoneRemoteConnection()
-                        }
-                        .compatibilityButtonStyle(
-                            model.isPhoneRemoteConnectionEnabled ? .standard : .prominent
-                        )
-
-                        Link(destination: AppLinks.testFlightPublicBeta) {
-                            Label("connection.web.invite.testflight_open", systemImage: "arrow.up.right.square")
-                        }
-                        .compatibilityButtonStyle(.standard)
-
-                        Button {
-                            copyTestFlightPublicBetaLink()
-                        } label: {
-                            Label(
-                                localization.text(
-                                    isTestFlightLinkCopied
-                                        ? "common.status.copied"
-                                        : "common.action.copy_link"
-                                ),
-                                systemImage: isTestFlightLinkCopied ? "checkmark" : "doc.on.doc"
-                            )
-                        }
-                        .compatibilityButtonStyle(.standard)
-                    }
-                }
-
-                Divider()
-
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 21, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 34)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("connection.web.title")
-                            .font(.subheadline.weight(.semibold))
-                        Text("connection.web.help_short")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 8)
-                    Text(webRemoteStatusText)
-                        .font(.caption)
-                        .foregroundStyle(webRemoteStatusTint)
-                        .lineLimit(1)
-                    Button(
-                        model.webRemoteState.isEnabled
-                            ? "connection.web.show_qr"
-                            : "connection.web.connect"
-                    ) {
-                        requestWebRemoteSession()
-                    }
-                    .compatibilityButtonStyle(.standard)
-                }
-
-                Divider()
-
-                HStack(spacing: 10) {
-                    Label(
-                        LocalizedMessage(
-                            "connection.trusted_devices.count_long",
-                            arguments: [String(settings.trustedPhoneIdentityFingerprints.count)]
-                        ).text(using: localization),
-                        systemImage: "checkmark.shield"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("connection.trusted_devices.clear") {
-                        isClearTrustedPhonesConfirmationPresented = true
-                    }
-                    .compatibilityButtonStyle(.standard)
-                    .disabled(settings.trustedPhoneIdentityFingerprints.isEmpty)
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -2496,16 +2238,6 @@ struct SettingsView: View {
 
                                 Spacer()
 
-                                VStack(alignment: .trailing, spacing: 3) {
-                                    Toggle(
-                                        "about.version.check_prerelease",
-                                        isOn: $settings.checksForPreReleaseUpdates
-                                    )
-                                    .toggleStyle(.switch)
-                                    Text("about.version.check_prerelease_help_short")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
                             }
                         }
                     }
@@ -2992,84 +2724,6 @@ struct SettingsView: View {
 
     private var connectionBadge: String {
         localization.text(model.isConnected ? "common.status.connected" : "common.status.connecting")
-    }
-
-    private var webRemoteStatusText: String {
-        switch model.webRemoteState {
-        case .disabled:
-            return localization.text("connection.web.disabled")
-        case .unavailable:
-            return localization.text("connection.web.unavailable")
-        case .connecting:
-            return localization.text("connection.web.connecting")
-        case .waitingForPhone:
-            return localization.text("connection.web.waiting_scan")
-        case .awaitingApproval:
-            return localization.text("connection.web.waiting_approval")
-        case .connected:
-            return localization.text("connection.web.connected")
-        case .failed:
-            return localization.text("connection.web.failed")
-        }
-    }
-
-    private var webRemoteStatusTint: Color {
-        switch model.webRemoteState {
-        case .connected:
-            return .green
-        case .failed, .unavailable:
-            return .orange
-        default:
-            return .secondary
-        }
-    }
-
-    private func requestWebRemoteSession() {
-        guard isWebRemoteInviteAuthorized else {
-            webRemoteInviteCode = ""
-            isTestFlightLinkCopied = false
-            isWebRemoteInvitePresented = true
-            return
-        }
-        openWebRemoteSession()
-    }
-
-    private func validateWebRemoteInviteCode() {
-        guard webRemoteInviteCode.trimmingCharacters(in: .whitespacesAndNewlines) ==
-                Self.requiredWebRemoteInviteCode
-        else {
-            webRemoteInviteCode = ""
-            isWebRemoteInvitePresented = false
-            DispatchQueue.main.async {
-                isWebRemoteInviteInvalidPresented = true
-            }
-            return
-        }
-        webRemoteInviteCode = ""
-        if !model.webRemoteState.isEnabled {
-            model.enableWebRemoteConnection()
-        }
-        guard model.webRemoteState.isEnabled else {
-            isWebRemoteInvitePresented = false
-            return
-        }
-        isWebRemoteInviteAuthorized = true
-    }
-
-    private func copyTestFlightPublicBetaLink() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        isTestFlightLinkCopied = pasteboard.writeObjects([
-            AppLinks.testFlightPublicBeta.absoluteString as NSString
-        ])
-    }
-
-    private func openWebRemoteSession() {
-        if !model.webRemoteState.isEnabled {
-            model.enableWebRemoteConnection()
-        }
-        guard model.webRemoteState.isEnabled else { return }
-        isWebRemoteSessionPresented = true
     }
 
     private var connectionTint: Color {

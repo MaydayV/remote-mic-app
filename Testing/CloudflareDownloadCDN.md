@@ -75,7 +75,7 @@
 ## 稳定功能回归
 
 - [x] App 内置 `SUFeedURL` 仍为 GitHub latest appcast。
-- [x] 预发布开关缺失/默认关闭、明确关闭、开启、使用后再关闭的相关自动化回归通过；候选 UI 更新尚未执行。
+- [x] 客户端稳定 feed 与候选发布资产相互隔离；客户端不提供预发布检查开关。
 - [x] 当前 Stable latest 仍为 `v1.8.3`，Worker 与官网部署没有改变正式版。
 - [x] GitHub Release 页面和 `v1.8.3` 固定标签 DMG 可直接下载，并与 CDN 字节一致。
 - [ ] 官网 GitHub、TestFlight、社群、版本历史和其他作品链接保持正常。

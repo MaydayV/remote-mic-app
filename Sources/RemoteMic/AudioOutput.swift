@@ -295,11 +295,10 @@ enum VirtualAudioConnectionLifecyclePolicy {
         siriRemoteReady: Bool = false,
         siriRemoteVoiceActive: Bool = false,
         bluetoothVoiceActive: Bool = false,
-        mobileVoiceActive: Bool,
         testToneActive: Bool,
         systemSuspended: Bool = false
     ) -> Bool {
-        if bluetoothVoiceActive || siriRemoteVoiceActive || mobileVoiceActive || testToneActive {
+        if bluetoothVoiceActive || siriRemoteVoiceActive || testToneActive {
             return true
         }
         let anyBridgeReady = readyBluetoothBridgeCount > 0 || siriRemoteReady

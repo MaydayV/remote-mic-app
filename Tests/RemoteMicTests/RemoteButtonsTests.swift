@@ -480,7 +480,7 @@ struct RemoteButtonsTests {
         }
     }
 
-    @Test func phoneVoicePostsFunctionKeyDownAndUp() {
+    @Test func voiceInputPostsFunctionKeyDownAndUp() {
         var posted: [(CGKeyCode, Bool, CGEventFlags)] = []
         let poster: KeyboardInjector.KeyStatePoster = { code, isDown, flags in
             posted.append((code, isDown, flags))
@@ -506,7 +506,7 @@ struct RemoteButtonsTests {
         #expect(posted[1].2.isEmpty)
     }
 
-    @Test func phoneVoiceFunctionKeyRequiresAccessibility() {
+    @Test func voiceInputFunctionKeyRequiresAccessibility() {
         var didPost = false
         #expect(!KeyboardInjector.setFunctionKeyPressed(
             true,
@@ -1445,60 +1445,14 @@ struct RemoteButtonsTests {
         #expect(!target.voiceFnTapModeEnabled)
     }
 
-    @Test func trustedPhoneIdentitiesPersistDeduplicateAndClear() throws {
-        let suiteName = "RemoteMicTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let settings = AppSettings(defaults: defaults)
-        settings.trustPhoneIdentity("identity-a")
-        settings.trustPhoneIdentity("identity-a")
-        settings.trustPhoneIdentity("identity-b")
-
-        let restored = AppSettings(defaults: defaults)
-        #expect(restored.trustedPhoneIdentityFingerprints == Set(["identity-a", "identity-b"]))
-        #expect(restored.isPhoneIdentityTrusted("identity-a"))
-        #expect(!restored.isPhoneIdentityTrusted("identity-c"))
-
-        restored.clearTrustedPhoneIdentities()
-        #expect(AppSettings(defaults: defaults).trustedPhoneIdentityFingerprints.isEmpty)
-    }
-
-    @Test func phoneIdentityProofMustMatchTheCurrentSessionKey() throws {
-        let identity = P256.Signing.PrivateKey()
-        let firstSessionKey = Data(repeating: 0x11, count: 32)
-        let secondSessionKey = Data(repeating: 0x22, count: 32)
-        let signature = try identity.signature(
-            for: PhoneRemoteIdentityVerifier.proof(for: firstSessionKey)
-        )
-
-        let verified = PhoneRemoteIdentityVerifier.verify(
-            identityPublicKey: identity.publicKey.rawRepresentation.base64EncodedString(),
-            identitySignature: signature.rawRepresentation.base64EncodedString(),
-            sessionPublicKey: firstSessionKey
-        )
-        guard case .verified = verified else {
-            Issue.record("Expected a valid identity proof")
-            return
-        }
-        #expect(PhoneRemoteIdentityVerifier.verify(
-            identityPublicKey: identity.publicKey.rawRepresentation.base64EncodedString(),
-            identitySignature: signature.rawRepresentation.base64EncodedString(),
-            sessionPublicKey: secondSessionKey
-        ) == .invalid)
-    }
-
     @Test func updateAndLaunchPreferencesPersistAndImportCompatibly() throws {
         let sourceSuiteName = "RemoteMicTests.\(UUID().uuidString)"
         let sourceDefaults = try #require(UserDefaults(suiteName: sourceSuiteName))
         defer { sourceDefaults.removePersistentDomain(forName: sourceSuiteName) }
         let sourceSettings = AppSettings(defaults: sourceDefaults)
         #expect(sourceSettings.openMainWindowAtLaunch)
-        #expect(!sourceSettings.checksForPreReleaseUpdates)
         sourceSettings.openMainWindowAtLaunch = false
-        sourceSettings.checksForPreReleaseUpdates = true
         #expect(!AppSettings(defaults: sourceDefaults).openMainWindowAtLaunch)
-        #expect(AppSettings(defaults: sourceDefaults).checksForPreReleaseUpdates)
 
         let exportedData = try sourceSettings.exportedConfigurationData()
         let targetSuiteName = "RemoteMicTests.\(UUID().uuidString)"
@@ -1507,20 +1461,16 @@ struct RemoteButtonsTests {
         let targetSettings = AppSettings(defaults: targetDefaults)
         try targetSettings.importConfiguration(from: exportedData)
         #expect(!targetSettings.openMainWindowAtLaunch)
-        #expect(targetSettings.checksForPreReleaseUpdates)
 
         var legacyObject = try #require(
             JSONSerialization.jsonObject(with: exportedData) as? [String: Any]
         )
         legacyObject.removeValue(forKey: "openMainWindowAtLaunch")
-        legacyObject.removeValue(forKey: "checksForPreReleaseUpdates")
         targetSettings.openMainWindowAtLaunch = true
-        targetSettings.checksForPreReleaseUpdates = false
         try targetSettings.importConfiguration(
             from: try JSONSerialization.data(withJSONObject: legacyObject)
         )
         #expect(targetSettings.openMainWindowAtLaunch)
-        #expect(!targetSettings.checksForPreReleaseUpdates)
     }
 
     @Test func localUsageStatisticsSeparatesTodayWeekAndTotalAndPersists() throws {
@@ -1675,20 +1625,20 @@ struct RemoteButtonsTests {
         )
         settings.recordButtonPress(
             control: .remoteButton(.menu),
-            source: .webRemote,
+            source: .siriRemote,
             at: voiceStartedAt,
             calendar: calendar
         )
         settings.recordButtonPress(
             control: .voice,
-            source: .nearbyPhone,
+            source: .siriRemote,
             at: voiceStartedAt,
             calendar: calendar
         )
         settings.recordVoiceDuration(
             120,
             startedAt: voiceStartedAt,
-            source: .nearbyPhone,
+            source: .siriRemote,
             at: voiceEndedAt,
             calendar: calendar
         )
@@ -1701,25 +1651,24 @@ struct RemoteButtonsTests {
         #expect(metadata.firstActivityAt == firstButton)
         #expect(metadata.lastActivityAt == voiceEndedAt)
         #expect(metadata.buttonPressCountBySource[.bluetoothRemote] == 1)
-        #expect(metadata.buttonPressCountBySource[.webRemote] == 1)
-        #expect(metadata.buttonPressCountBySource[.nearbyPhone] == 1)
+        #expect(metadata.buttonPressCountBySource[.siriRemote] == 2)
         #expect(metadata.buttonPressCountByControl["button.ok"] == 1)
         #expect(metadata.buttonPressCountByControl["button.menu"] == 1)
         #expect(metadata.buttonPressCountByControl["voice"] == 1)
         #expect(metadata.buttonPressCountByHour[9] == 1)
         #expect(metadata.buttonPressCountByHour[14] == 2)
         #expect(metadata.voiceSessionCount == 1)
-        #expect(metadata.voiceSessionCountBySource[.nearbyPhone] == 1)
+        #expect(metadata.voiceSessionCountBySource[.siriRemote] == 1)
         #expect(metadata.voiceSessionCountByEndHour[14] == 1)
-        #expect(metadata.voiceDurationBySource[.nearbyPhone] == 120)
+        #expect(metadata.voiceDurationBySource[.siriRemote] == 120)
         #expect(metadata.voiceDurationByEndHour[14] == 120)
         #expect(metadata.longestVoiceSessionDuration == 120)
-        #expect(metadata.longestVoiceSessionDurationBySource[.nearbyPhone] == 120)
+        #expect(metadata.longestVoiceSessionDurationBySource[.siriRemote] == 120)
         #expect(metadata.timeZoneIdentifiers == [calendar.timeZone.identifier])
         #expect(metadata.calendarIdentifiers == [String(describing: calendar.identifier)])
         #expect(metadata.schemaVersions == [1])
         #expect(settings.voiceSessionRanking.first?.startedAt == voiceStartedAt)
-        #expect(settings.voiceSessionRanking.first?.source == .nearbyPhone)
+        #expect(settings.voiceSessionRanking.first?.source == .siriRemote)
 
         let restored = AppSettings(defaults: defaults)
         #expect(restored.usageMetadata(for: .total, calendar: calendar) == metadata)
@@ -2134,33 +2083,6 @@ struct RemoteButtonsTests {
             trigger: .singleClick
         ).applicationProfileID == nil)
         #expect(restored.customApplicationProfile(id: profile.id) == profile)
-    }
-
-    @Test func preReleaseUpdateFeedAlwaysFallsBackToStableFeed() throws {
-        let stableFeed = "https://example.com/releases/latest/download/appcast.xml"
-        let preReleaseFeed = try #require(
-            URL(string: "https://example.com/releases/download/v1.7.3/appcast.xml")
-        )
-        var selection = UpdateFeedSelection(stableFeedURLString: stableFeed)
-
-        selection.usePreReleaseFeed(preReleaseFeed)
-        #expect(
-            selection.feedURLString(checksForPreReleaseUpdates: true)
-                == preReleaseFeed.absoluteString
-        )
-        #expect(selection.feedURLString(checksForPreReleaseUpdates: false) == stableFeed)
-
-        selection.useStableFeed()
-        #expect(selection.feedURLString(checksForPreReleaseUpdates: true) == stableFeed)
-        #expect(selection.feedURLString(checksForPreReleaseUpdates: false) == stableFeed)
-    }
-
-    @Test func intelUpdateSelectionUsesTheIntelAppcastNameForPreReleaseResolution() {
-        let selection = UpdateFeedSelection(
-            stableFeedURLString: "https://example.com/releases/latest/download/appcast-intel.xml"
-        )
-
-        #expect(selection.appcastAssetName == "appcast-intel.xml")
     }
 
     @Test func secondaryTriggerActionsPersistAndResetWithoutChangingSingleClick() throws {
