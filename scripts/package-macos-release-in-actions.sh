@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 umask 077
+setopt null_glob
 
 ROOT="${0:A:h:h}"
 EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-34T8V3NA4P}"
@@ -9,10 +10,11 @@ RELEASE_TAG="${RELEASE_TAG:-v$VERSION}"
 RELEASE_CREDENTIALS_REPO="${RELEASE_CREDENTIALS_REPO:?Set RELEASE_CREDENTIALS_REPO to the readonly credentials checkout}"
 MATCH_REPO="${MATCH_REPO:?Set MATCH_REPO to the readonly Match checkout}"
 AGE_IDENTITY_FILE="${AGE_IDENTITY_FILE:?Set AGE_IDENTITY_FILE to the protected CI age identity}"
+ASC_ISSUER_ID="${ASC_ISSUER_ID:?Set ASC_ISSUER_ID to the App Store Connect issuer ID}"
 ISOLATED_KEYCHAIN_RUNNER="$RELEASE_CREDENTIALS_REPO/run-with-isolated-release-keychain.sh"
 SECRETS_VALIDATOR="$RELEASE_CREDENTIALS_REPO/skills/remotemic-notary-secrets/scripts/validate-notary-secrets-repo.sh"
 MATCH_VALIDATOR="$MATCH_REPO/skills/apple-signing-match/scripts/validate-signing-repo.sh"
-P8_ENCRYPTED_FILE="$RELEASE_CREDENTIALS_REPO/AuthKey_JG5HB3CLJ3.p8.github-actions.age"
+P8_ENCRYPTED_FILES=("$RELEASE_CREDENTIALS_REPO"/AuthKey_*.p8.github-actions.age(N))
 MATCH_PASSWORD_ENCRYPTED_FILE="$RELEASE_CREDENTIALS_REPO/match-password.github-actions.age"
 SPARKLE_PRIVATE_KEY_ENCRYPTED_FILE="$RELEASE_CREDENTIALS_REPO/sparkle-ed25519.github-actions.key.age"
 
@@ -40,6 +42,11 @@ if ! print -r -- "${EARLY_ACCESS_SERVICE_URL:-}" | rg -q '^https://[^/?#]+/?$'; 
   print -u2 "EARLY_ACCESS_SERVICE_URL must be a production root HTTPS URL"
   exit 1
 fi
+if (( ${#P8_ENCRYPTED_FILES} != 1 )); then
+  print -u2 "release credentials repository must contain exactly one AuthKey_*.p8.github-actions.age file"
+  exit 1
+fi
+P8_ENCRYPTED_FILE="${P8_ENCRYPTED_FILES[1]}"
 
 for required_file in \
   "$AGE_IDENTITY_FILE" \
@@ -64,6 +71,7 @@ fi
 
 ALLOW_ISOLATED_RELEASE_KEYCHAIN=1 \
 AGE_IDENTITY_FILE="$AGE_IDENTITY_FILE" \
+ASC_ISSUER_ID="$ASC_ISSUER_ID" \
 MATCH_GIT_URL="file://$MATCH_REPO" \
 P8_ENCRYPTED_FILE="$P8_ENCRYPTED_FILE" \
 MATCH_PASSWORD_ENCRYPTED_FILE="$MATCH_PASSWORD_ENCRYPTED_FILE" \
