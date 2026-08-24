@@ -90,7 +90,7 @@ jobs:
       - name: Check out readonly release credentials
         uses: actions/checkout@v5
         with:
-          repository: HD838A/remotemic-notary-secrets
+          repository: MaydayV/remotemic-notary-secrets
           path: .private-release/remotemic-notary-secrets
           ssh-key: ${{ secrets.RELEASE_CREDENTIALS_DEPLOY_KEY }}
           persist-credentials: false
@@ -98,7 +98,7 @@ jobs:
       - name: Check out readonly Match signing identities
         uses: actions/checkout@v5
         with:
-          repository: HD838A/apple-signing-match
+          repository: MaydayV/apple-signing-match
           path: .private-release/apple-signing-match
           ssh-key: ${{ secrets.APPLE_SIGNING_MATCH_DEPLOY_KEY }}
           persist-credentials: false

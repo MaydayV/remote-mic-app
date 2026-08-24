@@ -20,7 +20,7 @@
 7. Tag、远端候选分支和发布资产必须解析到同一个提交。GitHub Release 必须保持 Pre-release，稳定 `latest` 不得变化。
 8. 发布脚本会重新下载全部公开资产并逐字节复核；使用公开稳定版执行固定候选 appcast 的真实 Sparkle 更新。
 
-GitHub 自动生成的 CI App 只用于验证打包结构，不是公开安装包。自动签名发布依赖 `mac-release` Environment 中已有的受保护凭据；凭据缺失时工作流会失败且不会生成可下载的公开安装包。
+GitHub 自动生成的 CI App 只用于验证打包结构，不是公开安装包。自动签名发布依赖 `mac-release` Environment 中已有的受保护凭据，以及 `MaydayV/remotemic-notary-secrets` 和 `MaydayV/apple-signing-match` 两个私有仓库；凭据缺失时工作流会失败且不会生成可下载的公开安装包。
 
 ## 正式晋升
 
