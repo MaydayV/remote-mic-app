@@ -472,5 +472,7 @@ struct BuildSigningTests {
         #expect(preparationSource.contains("CFBundleVersion"))
         #expect(preparationSource.contains("ReleaseHistory.md"))
         #expect(preparationSource.contains("GITHUB_RUN_NUMBER"))
+        #expect(preparationSource.contains("git ls-remote --exit-code --refs origin"))
+        #expect(preparationSource.contains("collision_count"))
     }
 }

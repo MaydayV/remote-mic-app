@@ -56,6 +56,23 @@ if [[ ! "$run_number" =~ '^[0-9]+$' ]]; then
 fi
 build="$((BASE_BUILD + 100000 + run_number))"
 release_tag="v$version"
+# A failed run may have created the tag before signing or notarization failed.
+# Keep that immutable provenance and advance to the next patch version instead
+# of trying to retag a different main commit over it.
+collision_count=0
+while git ls-remote --exit-code --refs origin "refs/tags/$release_tag" >/dev/null 2>&1; do
+  if [[ ! "$version" =~ '^([0-9]+)\.([0-9]+)\.([0-9]+)$' ]]; then
+    print -u2 "generated release version is not semantic: $version"
+    exit 1
+  fi
+  version="${match[1]}.${match[2]}.$((match[3] + 1))"
+  release_tag="v$version"
+  collision_count=$((collision_count + 1))
+  if (( collision_count >= 100 )); then
+    print -u2 "could not find an unused release tag after 100 attempts"
+    exit 1
+  fi
+done
 commit_sha="$(git rev-parse HEAD)"
 commit_short_sha="$(git rev-parse --short=7 HEAD)"
 commit_subject="$(git log -1 --format=%s)"
