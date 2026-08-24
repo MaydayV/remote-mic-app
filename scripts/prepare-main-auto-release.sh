@@ -64,7 +64,7 @@ commit_subject="$(git log -1 --format=%s)"
 /usr/bin/plutil -replace CFBundleVersion -string "$build" "$PLIST"
 
 for locale in zh-Hans en; do
-  history="$ROOT/Resources/$locale.lproj/ReleaseHistory.md"
+  history_path="$ROOT/Resources/$locale.lproj/ReleaseHistory.md"
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   if [[ "$locale" == "zh-Hans" ]]; then
     first_note="自动发布：$commit_subject"
@@ -79,7 +79,7 @@ for locale in zh-Hans en; do
     print "- $first_note"
     print "- $second_note"
     print
-    /bin/cat "$history"
+    /bin/cat "$history_path"
   } > "$temporary"
   /bin/mv "$temporary" "$history"
 done
