@@ -15,7 +15,6 @@ ISOLATED_KEYCHAIN_RUNNER="$RELEASE_CREDENTIALS_REPO/run-with-isolated-release-ke
 SECRETS_VALIDATOR="$RELEASE_CREDENTIALS_REPO/skills/remotemic-notary-secrets/scripts/validate-notary-secrets-repo.sh"
 MATCH_VALIDATOR="$MATCH_REPO/skills/apple-signing-match/scripts/validate-signing-repo.sh"
 P8_ENCRYPTED_FILES=("$RELEASE_CREDENTIALS_REPO"/AuthKey_*.p8.github-actions.age(N))
-MATCH_PASSWORD_ENCRYPTED_FILE="$RELEASE_CREDENTIALS_REPO/match-password.github-actions.age"
 SPARKLE_PRIVATE_KEY_ENCRYPTED_FILE="$RELEASE_CREDENTIALS_REPO/sparkle-ed25519.github-actions.key.age"
 
 if [[ "$#" -ne 0 ]]; then
@@ -54,7 +53,6 @@ for required_file in \
   "$SECRETS_VALIDATOR" \
   "$MATCH_VALIDATOR" \
   "$P8_ENCRYPTED_FILE" \
-  "$MATCH_PASSWORD_ENCRYPTED_FILE" \
   "$SPARKLE_PRIVATE_KEY_ENCRYPTED_FILE"; do
   if [[ ! -r "$required_file" ]]; then
     print -u2 "required Actions release input is unavailable: $required_file"
@@ -74,7 +72,6 @@ AGE_IDENTITY_FILE="$AGE_IDENTITY_FILE" \
 ASC_ISSUER_ID="$ASC_ISSUER_ID" \
 MATCH_GIT_URL="file://$MATCH_REPO" \
 P8_ENCRYPTED_FILE="$P8_ENCRYPTED_FILE" \
-MATCH_PASSWORD_ENCRYPTED_FILE="$MATCH_PASSWORD_ENCRYPTED_FILE" \
 SPARKLE_PRIVATE_KEY_ENCRYPTED_FILE="$SPARKLE_PRIVATE_KEY_ENCRYPTED_FILE" \
   "$ISOLATED_KEYCHAIN_RUNNER" -- "$ROOT/scripts/package-macos-release-variants.sh"
 
