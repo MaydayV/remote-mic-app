@@ -121,6 +121,23 @@ for localization_dir in "${LOCALIZATION_DIRS[@]}"; do
     "$localization_dir" \
     "$APP_DIR/Contents/Resources/$localization"
 done
+
+# SwiftPM/Sparkle archives can carry runner-specific modes. Normalize the
+# bundle before signing so notarization sees only Apple's supported modes.
+find "$APP_DIR" -type d -exec chmod 755 {} +
+find "$APP_DIR" -type f -exec chmod 644 {} +
+for executable in \
+  "$APP_DIR/Contents/MacOS/$APP_NAME" \
+  "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" \
+  "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
+  "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater" \
+  "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer" \
+  "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader"; do
+  if [[ -f "$executable" ]]; then
+    chmod 755 "$executable"
+  fi
+done
+
 SPARKLE_VERSION_DIR="$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B"
 if [[ "$SIGNING_IDENTITY" != "-" ]]; then
   codesign \

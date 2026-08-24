@@ -22,6 +22,8 @@ struct BuildSigningTests {
         #expect(source.contains("--preserve-metadata=entitlements"))
         #expect(source.contains("$SPARKLE_VERSION_DIR/Autoupdate"))
         #expect(source.contains("$SPARKLE_VERSION_DIR/Updater.app"))
+        #expect(source.contains("find \"$APP_DIR\" -type f -exec chmod 644 {} +"))
+        #expect(source.contains("Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"))
         #expect(!source.contains("security find-identity -p codesigning -v"))
         #expect(!source.contains("git config --get user.email"))
         let signingSource = try #require(source.components(separatedBy: "codesign --verify --deep").first)
