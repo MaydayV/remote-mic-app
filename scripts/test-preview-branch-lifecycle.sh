@@ -37,6 +37,9 @@ git -C "$TEST_REPO" remote add origin "$REMOTE_REPO"
 /bin/cp "$VERIFIER" "$TEST_REPO/scripts/verify-preview-branch.sh"
 /bin/chmod 755 "$TEST_REPO/scripts/verify-preview-branch.sh"
 /bin/cp "$ROOT/Resources/Info.plist" "$TEST_REPO/Resources/Info.plist"
+base_build="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$TEST_REPO/Resources/Info.plist")"
+first_candidate_build="$((base_build + 1))"
+second_candidate_build="$((base_build + 2))"
 for locale in en zh-Hans; do
   print "## 1.8.14" > "$TEST_REPO/Resources/$locale.lproj/ReleaseHistory.md"
   print -- "- Previous preview" >> "$TEST_REPO/Resources/$locale.lproj/ReleaseHistory.md"
@@ -80,7 +83,7 @@ prepare_candidate() {
   git -C "$TEST_REPO" push -u origin "$branch" >/dev/null
 }
 
-prepare_candidate "release/pre-v1.8.15" "1.8.15" "107" "prepare 1.8.15"
+prepare_candidate "release/pre-v1.8.15" "1.8.15" "$first_candidate_build" "prepare 1.8.15"
 (
   cd "$TEST_REPO"
   RELEASE_CANDIDATE_BRANCH="" GITHUB_REF_NAME="" \
@@ -88,7 +91,7 @@ prepare_candidate "release/pre-v1.8.15" "1.8.15" "107" "prepare 1.8.15"
 ) > "$WORK_DIR/valid-output.txt"
 /usr/bin/grep -Fq "PREVIEW BRANCH PASS" "$WORK_DIR/valid-output.txt"
 
-prepare_candidate "release/pre-v1.8.16" "1.8.16" "108" "prepare 1.8.16"
+prepare_candidate "release/pre-v1.8.16" "1.8.16" "$second_candidate_build" "prepare 1.8.16"
 if (
   cd "$TEST_REPO"
   RELEASE_CANDIDATE_BRANCH="" GITHUB_REF_NAME="" \
