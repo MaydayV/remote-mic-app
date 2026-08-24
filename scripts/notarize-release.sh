@@ -29,7 +29,7 @@ EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-L3QHLDRPAY}"
 PARALLEL_PACKAGE_NOTARIZATION="${PARALLEL_PACKAGE_NOTARIZATION:-0}"
 PRIVATE_PRODUCTION_ENV="$ROOT/Apps/MobileWeb/.private/production.env"
 CDN_DOWNLOAD_PREFIX="${RELEASE_DOWNLOAD_PREFIX:-https://download.sayall.app/mac/releases/$RELEASE_TAG/}"
-RELEASE_PAGE="${RELEASE_PAGE_URL:-https://github.com/HD838A/remote-mic-app/releases/tag/$RELEASE_TAG}"
+RELEASE_PAGE="${RELEASE_PAGE_URL:-https://github.com/MaydayV/remote-mic-app/releases/tag/$RELEASE_TAG}"
 GENERATE_APPCAST="$ROOT/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
 SIGN_UPDATE="$ROOT/.build/artifacts/sparkle/Sparkle/bin/sign_update"
 

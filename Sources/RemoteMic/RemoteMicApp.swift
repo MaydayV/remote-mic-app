@@ -93,7 +93,7 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     }
 
     private static let releasesURL = URL(
-        string: "https://api.github.com/repos/HD838A/remote-mic-app/releases?per_page=30"
+        string: "https://api.github.com/repos/MaydayV/remote-mic-app/releases?per_page=30"
     )!
     private static let preReleaseFeedRefreshInterval: TimeInterval = 6 * 60 * 60
 

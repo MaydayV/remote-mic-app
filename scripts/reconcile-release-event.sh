@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 ROOT="${0:A:h:h}"
-REPOSITORY="HD838A/remote-mic-app"
+REPOSITORY="MaydayV/remote-mic-app"
 RELEASE_TAG="${1:-}"
 EVENT_ACTOR="${2:-}"
 RECORD_PREVIEW="${3:-0}"

@@ -2,7 +2,7 @@ import Foundation
 
 enum AppLinks {
     static let githubRepository = URL(
-        string: "https://github.com/HD838A/remote-mic-app"
+        string: "https://github.com/MaydayV/remote-mic-app"
     )!
     static let chineseWebsite = URL(string: "https://8586ai.com/")!
     static let englishWebsite = URL(string: "https://8586ai.com/en/")!

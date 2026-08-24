@@ -5,7 +5,7 @@ umask 022
 ROOT="${0:A:h:h}"
 OUTPUT_DIR="$ROOT/dist"
 PLIST="$ROOT/Resources/Info.plist"
-REPOSITORY="HD838A/remote-mic-app"
+REPOSITORY="MaydayV/remote-mic-app"
 MODE="${1:-}"
 DRY_RUN="${DRY_RUN:-0}"
 EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-L3QHLDRPAY}"

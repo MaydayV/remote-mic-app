@@ -5,7 +5,7 @@
 - 影响范围：macOS 公开预发布候选分支的 GitHub Actions 校验
 - 功能点：预发布候选来源与发布说明门禁
 - 简单描述：候选分支在本地校验通过，但 GitHub macOS runner 因未安装 `rg` 而错误判定发布说明缺失。
-- 原始记录：[首次失败 run 31458426481](https://github.com/HD838A/remote-mic-app/actions/runs/31458426481)、[后续失败 run 31458857425](https://github.com/HD838A/remote-mic-app/actions/runs/31458857425)、[修复通过 run 31459320898](https://github.com/HD838A/remote-mic-app/actions/runs/31459320898)
+- 原始记录：[首次失败 run 31458426481](https://github.com/MaydayV/remote-mic-app/actions/runs/31458426481)、[后续失败 run 31458857425](https://github.com/MaydayV/remote-mic-app/actions/runs/31458857425)、[修复通过 run 31459320898](https://github.com/MaydayV/remote-mic-app/actions/runs/31459320898)
 
 ## 复现
 

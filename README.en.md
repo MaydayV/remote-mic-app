@@ -29,7 +29,7 @@ Remote Mic is built natively with SwiftUI. While running in the background, it u
 
 ## Download and install
 
-Download the Apple Silicon release through the [Cloudflare CDN entry](https://download.sayall.app/mac). Intel Mac users must download `Remote-Mic-<version>-Intel.dmg` from [GitHub Releases](https://github.com/HD838A/remote-mic-app/releases/latest) instead of using the Apple Silicon package.
+Download the Apple Silicon release through the [Cloudflare CDN entry](https://download.sayall.app/mac). Intel Mac users must download `Remote-Mic-<version>-Intel.dmg` from [GitHub Releases](https://github.com/MaydayV/remote-mic-app/releases/latest) instead of using the Apple Silicon package.
 
 The DMG has one ordinary installation entry: double-click **Install Remote Mic.pkg** on Apple Silicon, or **Install Remote Mic Intel.pkg** on Intel Macs. It installs **Remote Mic.app** and checks the existing MiRemoteV 2ch. A healthy compatible driver is kept in place; a missing or unusable driver is installed or updated. Advanced users who need only the app can download the app-only ZIP from the same Release.
 
