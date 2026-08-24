@@ -34,8 +34,8 @@ INTEL_APPCAST="$INTEL_OUTPUT_DIR/appcast-intel.xml"
 INTEL_ZH_RELEASE_NOTES="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.zh.txt"
 INTEL_EN_RELEASE_NOTES="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.en.txt"
 
-if [[ "$#" -ne 1 || ( "$MODE" != "prerelease" && "$MODE" != "promote" ) ]]; then
-  print -u2 "usage: $0 prerelease|promote"
+if [[ "$#" -ne 1 || ( "$MODE" != "prerelease" && "$MODE" != "auto" && "$MODE" != "promote" ) ]]; then
+  print -u2 "usage: $0 prerelease|auto|promote"
   exit 1
 fi
 case "$DRY_RUN" in
@@ -46,7 +46,7 @@ if [[ "$EXPECTED_DEVELOPER_TEAM_ID" != "34T8V3NA4P" ]]; then
   print -u2 "refusing to publish for an unexpected Apple Developer Team"
   exit 1
 fi
-if [[ "$MODE" == "prerelease" ]]; then
+if [[ "$MODE" == "prerelease" || "$MODE" == "auto" ]]; then
   RELEASE_TAG="${REQUESTED_RELEASE_TAG:-v$VERSION}"
   if [[ "$RELEASE_TAG" != "v$VERSION" ]]; then
     print -u2 "RELEASE_TAG must match the version in Resources/Info.plist"
@@ -201,7 +201,7 @@ generate_release_notes() {
 
 generate_candidate_provenance() {
   local branch head_commit base_main_commit payload_json_file file_path file_name file_size file_sha
-  branch="$(git symbolic-ref --quiet --short HEAD)"
+  branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || print -r -- "${GITHUB_REF_NAME:-}")"
   head_commit="$(git rev-parse HEAD)"
   base_main_commit="$(git rev-parse HEAD^)"
   payload_json_file="$WORK_DIR/payload-assets.jsonl"
@@ -266,6 +266,32 @@ verify_candidate_source() {
   fi
   if [[ "$remote_tag_commit" != "$head_commit" ]]; then
     print -u2 "remote tag $RELEASE_TAG must point to candidate HEAD"
+    exit 1
+  fi
+}
+
+verify_auto_source() {
+  cd "$ROOT"
+  local head_commit local_tag_commit remote_tag_commit
+  if [[ "${GITHUB_REF_NAME:-}" != "main" ]]; then
+    print -u2 "automatic release requires the main branch"
+    exit 1
+  fi
+  head_commit="$(git rev-parse HEAD)"
+  local_tag_commit="$(git rev-parse "$RELEASE_TAG^{commit}" 2>/dev/null)" || {
+    print -u2 "local tag $RELEASE_TAG is missing"
+    exit 1
+  }
+  if [[ "$local_tag_commit" != "$head_commit" ]]; then
+    print -u2 "local tag $RELEASE_TAG does not point to main HEAD"
+    exit 1
+  fi
+  remote_tag_commit="$(git ls-remote origin "refs/tags/$RELEASE_TAG^{}" | /usr/bin/awk 'NR == 1 { print $1 }')"
+  if [[ -z "$remote_tag_commit" ]]; then
+    remote_tag_commit="$(git ls-remote origin "refs/tags/$RELEASE_TAG" | /usr/bin/awk 'NR == 1 { print $1 }')"
+  fi
+  if [[ "$remote_tag_commit" != "$head_commit" ]]; then
+    print -u2 "remote tag $RELEASE_TAG must point to main HEAD"
     exit 1
   fi
 }
@@ -364,6 +390,10 @@ verify_stable_download_redirect() {
 
 verify_downloaded_candidate() {
   local provenance="$DOWNLOAD_DIR/candidate-provenance.json"
+  local expected_candidate_branch="release/pre-${RELEASE_TAG}"
+  if [[ "$MODE" == "auto" ]]; then
+    expected_candidate_branch="main"
+  fi
   test -f "$provenance"
   VERSION="$(jq -r '.version' "$provenance")"
   BUILD="$(jq -r '.build' "$provenance")"
@@ -372,10 +402,11 @@ verify_downloaded_candidate() {
     --arg tag "$RELEASE_TAG" \
     --arg version "$VERSION" \
     --arg build "$BUILD" \
+    --arg candidateBranch "$expected_candidate_branch" \
     '(.schemaVersion == 1 or .schemaVersion == 2) and
      .repository == $repository and .tag == $tag and
      .version == $version and .build == $build and
-     .candidateBranch == ("release/pre-" + $tag) and
+     .candidateBranch == $candidateBranch and
      (.tagCommit | test("^[0-9a-f]{40}$")) and
      (if .schemaVersion == 2 then (.baseMainCommit | test("^[0-9a-f]{40}$")) else true end) and
      ((.payloadAssets | length) == 14 or (.payloadAssets | length) == 16)' "$provenance" >/dev/null
@@ -463,7 +494,7 @@ generate_stable_promotion() {
     "$STABLE_PROMOTION" >/dev/null
 }
 
-if [[ "$MODE" == "prerelease" ]]; then
+if [[ "$MODE" == "prerelease" || "$MODE" == "auto" ]]; then
   verify_local_artifacts
   stage_assets
   generate_release_notes
@@ -479,14 +510,24 @@ if [[ "$MODE" == "prerelease" ]]; then
     exit 0
   fi
 
-  verify_candidate_source
+  if [[ "$MODE" == "auto" ]]; then
+    verify_auto_source
+  else
+    verify_candidate_source
+  fi
   generate_candidate_provenance
   if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
     print -u2 "release $RELEASE_TAG already exists"
     exit 1
   fi
 
-  LATEST_BEFORE="$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)"
+  release_options=(--repo "$REPOSITORY" --verify-tag --title "Remote Mic $VERSION" --notes-file "$RELEASE_NOTES")
+  if [[ "$MODE" == "auto" ]]; then
+    release_options+=(--latest)
+  else
+    LATEST_BEFORE="$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)"
+    release_options+=(--prerelease --latest=false)
+  fi
   gh release create "$RELEASE_TAG" \
     "$STAGING_DIR/${UPDATE_ZIP:t}" \
     "$STAGING_DIR/Remote-Mic-$VERSION-Installer.pkg" \
@@ -505,17 +546,22 @@ if [[ "$MODE" == "prerelease" ]]; then
     "$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}" \
     "$STAGING_DIR/appcast-intel.xml" \
     "$CANDIDATE_PROVENANCE" \
-    --repo "$REPOSITORY" \
-    --verify-tag \
-    --prerelease \
-    --latest=false \
-    --title "Remote Mic $VERSION" \
-    --notes-file "$RELEASE_NOTES"
+    "${release_options[@]}"
 
   RELEASE_STATE="$(gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" --jq '[.draft, .prerelease] | @tsv')"
-  test "$RELEASE_STATE" = $'false\ttrue'
-  test "$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)" = "$LATEST_BEFORE"
+  if [[ "$MODE" == "auto" ]]; then
+    test "$RELEASE_STATE" = $'false\tfalse'
+    test "$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)" = "$RELEASE_TAG"
+  else
+    test "$RELEASE_STATE" = $'false\ttrue'
+    test "$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)" = "$LATEST_BEFORE"
+  fi
   download_and_compare_local_candidate
+  if [[ "$MODE" == "auto" ]]; then
+    verify_stable_download_redirect
+    print "AUTO STABLE RELEASE PUBLISH PASS: https://github.com/$REPOSITORY/releases/tag/$RELEASE_TAG"
+    exit 0
+  fi
   gh workflow run release-guard.yml \
     --repo "$REPOSITORY" \
     --ref main \

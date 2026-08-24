@@ -1,6 +1,8 @@
 name: macOS Signed Release Packages
 
 on:
+  push:
+    branches: [main]
   workflow_run:
     workflows: ["macOS Preview Candidate"]
     types: [completed]
@@ -12,7 +14,7 @@ on:
         type: string
 
 concurrency:
-  group: mac-signed-package-${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
+  group: mac-signed-package-${{ github.event_name }}-${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -23,6 +25,7 @@ jobs:
   package:
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_repository.full_name == github.repository &&
@@ -35,12 +38,13 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       EXPECTED_DEVELOPER_TEAM_ID: 34T8V3NA4P
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Check out release candidate
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Resolve candidate branch, version, and tag
@@ -50,21 +54,33 @@ jobs:
           REQUESTED_TAG: ${{ inputs.tag }}
           WORKFLOW_BRANCH: ${{ github.event.workflow_run.head_branch }}
           WORKFLOW_SHA: ${{ github.event.workflow_run.head_sha }}
+          PUSH_SHA: ${{ github.sha }}
         run: |
           if [[ "$EVENT_NAME" == "workflow_run" ]]; then
             candidate_branch="$WORKFLOW_BRANCH"
             expected_sha="$WORKFLOW_SHA"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            candidate_branch="main"
+            expected_sha="$PUSH_SHA"
           else
             candidate_branch="$GITHUB_REF_NAME"
             expected_sha="$(git rev-parse HEAD)"
           fi
-          if [[ ! "$candidate_branch" =~ ^release/pre-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            test "$candidate_branch" = "main"
+            ./scripts/prepare-main-auto-release.sh
+          elif [[ ! "$candidate_branch" =~ ^release/pre-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "release workflow requires a release/pre-vX.Y.Z candidate branch" >&2
             exit 1
           fi
           test "$(git rev-parse HEAD)" = "$expected_sha"
-          git switch -C "$candidate_branch"
+          if [[ "$EVENT_NAME" != "push" ]]; then
+            git switch -C "$candidate_branch"
+          fi
           version="${candidate_branch#release/pre-v}"
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            version="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - Resources/Info.plist)"
+          fi
           tag="${REQUESTED_TAG:-v$version}"
           test "$tag" = "v$version"
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
@@ -74,7 +90,9 @@ jobs:
 
       - name: Validate candidate and create matching tag
         run: |
-          ./scripts/verify-preview-branch.sh
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            ./scripts/verify-preview-branch.sh
+          fi
           remote_tag_commit="$(git ls-remote origin "refs/tags/$RELEASE_TAG^{}" | awk 'NR == 1 { print $1 }')"
           if [[ -z "$remote_tag_commit" ]]; then
             git config user.name "github-actions[bot]"
@@ -124,7 +142,11 @@ jobs:
         run: |
           version="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - Resources/Info.plist)"
           test "$RELEASE_TAG" = "v$version"
-          ./scripts/verify-preview-branch.sh
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            ./scripts/verify-preview-branch.sh
+          else
+            test "$GITHUB_REF_NAME" = "main"
+          fi
 
       - name: Run Apple Silicon release gates
         env:
@@ -144,10 +166,15 @@ jobs:
       - name: Sign, notarize, staple, and verify both variants
         run: ./scripts/package-macos-release-in-actions.sh
 
-      - name: Publish signed GitHub pre-release and verify assets
+      - name: Publish signed GitHub release and verify assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./scripts/publish-release.sh prerelease
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            ./scripts/publish-release.sh auto
+          else
+            ./scripts/publish-release.sh prerelease
+          fi
 
       - name: Upload signed release packages
         uses: actions/upload-artifact@v4

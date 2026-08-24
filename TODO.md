@@ -158,6 +158,7 @@
   - 自动切换是辅助功能，失败时应提示并继续现有录音链路，不得影响遥控器语音、虚拟麦克风和普通按键行为。
 - [x] 新增 pre-release 发布，避免未实测的功能被检测到更新
   - 候选版本只由 GitHub Actions 发布流程管理；客户端固定使用稳定更新源，不展示或检查候选版本。
+  - `main` 提交现由受保护的 macOS 发布工作流自动生成递增版本、签名公证安装包、双语 Release Notes 和 Stable/Latest GitHub Release；客户端可通过稳定 feed 自动发现。
   - macOS 候选统一使用从最新 `main` 创建的 `release/pre-vX.Y.Z` 分支；功能必须先合入 `main`，候选分支只保留一个版本、ReleaseHistory 和测试说明提交，禁止从旧预览分支或 Tag 串联下一候选。Push 后由 GitHub Actions 自动完成来源校验、完整 Mac 测试、签名、公证、安装包上传和 GitHub Pre-release 发布，更新说明从中英文 ReleaseHistory 自动生成。
   - Pre-release 资产完成发布和下载字节校验后，由 Release Guard 创建候选分支到 `main` 的 PR，并在 Apple Silicon、Intel 必需检查通过后自动合并；这只把候选提交记录回 `main`，不会把 GitHub Release 晋升为正式版。下一预览版必须从回流后的最新 `main` 创建。
   - 正式版只能选择已经发布并验证过的 Pre-release，复用完全相同的 Tag、签名、公证资产和摘要；候选回流 `main` 不构成正式发布授权，禁止从 `main` 重建正式资产。

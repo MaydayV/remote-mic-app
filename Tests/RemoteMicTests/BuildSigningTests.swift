@@ -120,8 +120,8 @@ struct BuildSigningTests {
         #expect(!fastReleaseSource.contains("git push origin main"))
         #expect(notarizeSource.contains("wait \"$install_notary_pid\""))
         #expect(notarizeSource.contains("wait \"$uninstall_notary_pid\""))
-        #expect(publishSource.contains("usage: $0 prerelease|promote"))
-        #expect(!publishSource.contains("prerelease|promote|release"))
+        #expect(publishSource.contains("usage: $0 prerelease|auto|promote"))
+        #expect(publishSource.contains(".candidateBranch == $candidateBranch"))
         #expect(publishSource.contains("stable promotion is restricted to main"))
         #expect(publishSource.contains("candidate-provenance.json"))
         #expect(publishSource.contains("schemaVersion: 2"))
@@ -348,7 +348,7 @@ struct BuildSigningTests {
         }
         return source.contains("stable promotion requires an explicit RELEASE_TAG") &&
             source.contains("VERSION=\"$(jq -r '.version' \"$provenance\")\"") &&
-            source.contains(".candidateBranch == (\"release/pre-\" + $tag)")
+            source.contains(".candidateBranch == $candidateBranch")
     }
 
     @Test func releasePublishesLocalizedUpdateNotesWithImmutableURLs() throws {
@@ -409,6 +409,8 @@ struct BuildSigningTests {
         )
 
         #expect(workflowSource.contains("workflow_dispatch:"))
+        #expect(workflowSource.contains("push:"))
+        #expect(workflowSource.contains("branches: [main]"))
         #expect(workflowSource.contains("workflow_run:"))
         #expect(workflowSource.contains("macOS Preview Candidate"))
         #expect(workflowSource.contains("github.event.workflow_run.conclusion == 'success'"))
@@ -416,6 +418,9 @@ struct BuildSigningTests {
         #expect(workflowSource.contains("actions: write"))
         #expect(workflowSource.contains("git tag -a \"$RELEASE_TAG\""))
         #expect(workflowSource.contains("publish-release.sh prerelease"))
+        #expect(workflowSource.contains("publish-release.sh auto"))
+        #expect(workflowSource.contains("prepare-main-auto-release.sh"))
+        #expect(workflowSource.contains("github.event_name == 'push'"))
         #expect(workflowSource.contains("RELEASE_CANDIDATE_BRANCH"))
         #expect(workflowSource.contains("environment: mac-release"))
         #expect(workflowSource.contains("RELEASE_CREDENTIALS_DEPLOY_KEY"))
@@ -434,8 +439,25 @@ struct BuildSigningTests {
         #expect(!workflowSource.contains("NOTARY_API_KEY_BASE64"))
         #expect(!workflowSource.contains("SPARKLE_PRIVATE_KEY_BASE64"))
         #expect(!workflowSource.contains("pull_request:"))
-        #expect(!workflowSource.contains("push:"))
         #expect(publishSource.contains("## What's New"))
         #expect(publishSource.contains("Resources/en.lproj/ReleaseHistory.md"))
+    }
+
+    @Test func mainPushPreparesANewVersionAndStableReleaseNotes() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let preparationSource = try String(
+            contentsOf: root.appendingPathComponent(
+                "scripts/prepare-main-auto-release.sh"
+            ),
+            encoding: .utf8
+        )
+        #expect(preparationSource.contains("releases/latest"))
+        #expect(preparationSource.contains("CFBundleShortVersionString"))
+        #expect(preparationSource.contains("CFBundleVersion"))
+        #expect(preparationSource.contains("ReleaseHistory.md"))
+        #expect(preparationSource.contains("GITHUB_RUN_NUMBER"))
     }
 }

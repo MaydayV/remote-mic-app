@@ -22,6 +22,14 @@
 
 GitHub 自动生成的 CI App 只用于验证打包结构，不是公开安装包。自动签名发布依赖 `mac-release` Environment 中已有的受保护凭据，以及 `MaydayV/remotemic-notary-secrets` 和 `MaydayV/apple-signing-match` 两个私有仓库；凭据缺失时工作流会失败且不会生成可下载的公开安装包。
 
+## main 自动发布
+
+- 每次提交进入 `main` 后，`mac-release-package.yml` 会自动启动签名发布工作流；普通 `macOS CI` 仍负责独立的测试和双架构 Release 编译门禁。
+- 自动流程从 GitHub 最新正式 Release 推导下一个补丁版本，并使用 GitHub Actions Run Number 生成递增 Build；不会改写仓库中的版本文件或提交机器人版本提交。
+- 工作流在临时工作区生成中英文 Release Notes，内容来自当前提交说明和提交短 SHA；随后执行 Apple Silicon、Intel、测试、公证、Sparkle 签名、DMG/PKG/ZIP 校验，并创建正式 GitHub Release。
+- 自动 Release 使用 `vX.Y.Z` Tag 并标记为 Stable/Latest，因此客户端内置的稳定 Sparkle feed 可以发现并提示更新。自动发布不是 Pre-release，也不依赖手机 App 或内测入口。
+- 自动发布仍依赖受保护的 `mac-release` Environment、Developer ID 证书、公证 API、Sparkle 私钥，以及 `MaydayV/remotemic-notary-secrets` 和 `MaydayV/apple-signing-match`；任一凭据缺失时流程失败且不会发布半成品。
+
 ## 正式晋升
 
 - 只有用户明确指定具体版本并要求正式发布时才允许晋升。
