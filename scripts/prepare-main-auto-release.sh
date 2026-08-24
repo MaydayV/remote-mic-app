@@ -81,7 +81,7 @@ for locale in zh-Hans en; do
     print
     /bin/cat "$history_path"
   } > "$temporary"
-  /bin/mv "$temporary" "$history"
+  /bin/mv "$temporary" "$history_path"
 done
 
 if [[ -n "${GITHUB_ENV:-}" ]]; then
