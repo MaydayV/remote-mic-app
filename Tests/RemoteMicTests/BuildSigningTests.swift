@@ -60,7 +60,7 @@ struct BuildSigningTests {
         #expect(verifySource.contains("Developer ID app is missing a production Web Remote relay URL"))
     }
 
-    @Test func productionReleaseRequiresAndVerifiesPrivateFeaturePackage() throws {
+    @Test func productionReleaseDoesNotRequirePrivateFeaturePackage() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -78,14 +78,14 @@ struct BuildSigningTests {
             encoding: .utf8
         )
 
-        #expect(buildSource.contains("SAYALL_AI_PACKAGE_PATH"))
-        #expect(buildSource.contains("A SayAllAI package is required for this build"))
-        #expect(buildSource.contains("SayAllAI_SayAllAI.bundle"))
-        #expect(buildSource.contains("SayAllAIIncluded"))
+        #expect(!buildSource.contains("SAYALL_AI_PACKAGE_PATH"))
+        #expect(!buildSource.contains("A SayAllAI package is required for this build"))
+        #expect(!buildSource.contains("SayAllAI_SayAllAI.bundle"))
+        #expect(!buildSource.contains("SayAllAIIncluded"))
         #expect(buildSource.contains("DEFAULT_SCRATCH_PATH=\"/private/tmp/remote-mic-swiftpm/"))
         #expect(!buildSource.contains("DEFAULT_SCRATCH_PATH=\"$ROOT/.build-app-sayall-ai\""))
-        #expect(notarizeSource.contains("export REQUIRE_SAYALL_AI_PACKAGE=1"))
-        #expect(verifySource.contains("App is missing the required SayAllAI package marker"))
+        #expect(!notarizeSource.contains("REQUIRE_SAYALL_AI_PACKAGE"))
+        #expect(!verifySource.contains("SayAllAI"))
     }
 
     @Test func unavailablePreReleaseFeedDoesNotPresentACustomErrorAlert() throws {
@@ -185,8 +185,8 @@ struct BuildSigningTests {
         #expect(workflowSource.contains("./scripts/test.sh"))
         #expect(workflowSource.contains("./scripts/build-dmg.sh"))
         #expect(workflowSource.contains("./scripts/verify-dmg.sh"))
-        #expect(workflowSource.contains("GetSayAll/sayall-ai"))
-        #expect(workflowSource.contains("REQUIRE_SAYALL_AI_PACKAGE=1"))
+        #expect(!workflowSource.contains("GetSayAll/sayall-ai"))
+        #expect(!workflowSource.contains("REQUIRE_SAYALL_AI_PACKAGE=1"))
         #expect(workflowSource.contains("actions/upload-artifact@v4"))
         #expect(workflowSource.contains("contents: read"))
         #expect(!workflowSource.contains("MATCH_PASSWORD"))

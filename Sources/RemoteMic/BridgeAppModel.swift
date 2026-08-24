@@ -30,7 +30,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private static let longRecordingCloseTimeout: TimeInterval = 2
 
     let settings: AppSettings
-    let privateFeature: PrivateFeatureIntegration
 
     @Published private(set) var connectionStatus = LocalizedMessage("bluetooth.status.initializing")
     @Published private(set) var hidStatus = LocalizedMessage("button_mapping.status.disabled")
@@ -151,13 +150,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     init(
         settings: AppSettings = AppSettings(),
-        initialAudioDevices: [AudioDeviceInfo] = [],
-        privateFeature: PrivateFeatureIntegration = PrivateFeatureIntegration()
+        initialAudioDevices: [AudioDeviceInfo] = []
     ) {
         self.settings = settings
         activeBackendKind = RemoteBackendKind(rawValue: settings.activeBackendKindRawValue)
             ?? .xiaomi
-        self.privateFeature = privateFeature
         audioDevices = initialAudioDevices
         audioOutput.onConfigurationChange = { [weak self] in
             self?.scheduleAudioRecovery(reason: "engine_configuration_change")
@@ -296,7 +293,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         MainActor.assumeIsolated {
             siriRemoteBackend.stop()
         }
-        privateFeature.stop()
         guard started else { return }
         started = false
         completedUpdateHIDRecoveryWorkItem?.cancel()
@@ -2195,7 +2191,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func beginVoiceSessionIfNeeded() {
         guard !isStreaming else { return }
-        privateFeature.startVoiceSession()
         cancelTestToneIfNeeded(
             statusMessage: LocalizedMessage("audio.test_tone.blocked_voice_active"),
             logReason: "voice_start"
@@ -2229,7 +2224,6 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         if flushAudio {
             audioOutput.endSession()
         }
-        privateFeature.finishVoiceSession()
     }
 
     private var currentVoiceUsageSource: UsageEventSource {

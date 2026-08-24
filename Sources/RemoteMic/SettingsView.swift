@@ -7,7 +7,6 @@ import UniformTypeIdentifiers
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case connection
-    case privateFeature
     case mapping
     case statistics
     case permissions
@@ -18,7 +17,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: LocalizedStringKey {
         switch self {
         case .connection: return "settings.section.connection"
-        case .privateFeature: return ""
         case .mapping: return "settings.section.buttons"
         case .statistics: return "settings.section.statistics"
         case .permissions: return "settings.section.permissions"
@@ -29,7 +27,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .connection: return "link"
-        case .privateFeature: return "sparkles"
         case .mapping: return "keyboard"
         case .statistics: return "chart.bar.xaxis"
         case .permissions: return "shield.lefthalf.filled"
@@ -135,26 +132,9 @@ enum MappingPermissionPolicy {
     }
 }
 
-struct PrivateFeatureEntryRevealState: Equatable {
-    static let requiredTapCount = 5
-
-    private(set) var tapCount = 0
-
-    var isUnlocked: Bool {
-        tapCount >= Self.requiredTapCount
-    }
-
-    mutating func registerVersionTap() -> Bool {
-        guard !isUnlocked else { return false }
-        tapCount += 1
-        return isUnlocked
-    }
-}
-
 struct SettingsView: View {
     @ObservedObject var model: BridgeAppModel
     @ObservedObject var settings: AppSettings
-    @ObservedObject private var privateFeature: PrivateFeatureIntegration
     @ObservedObject private var updateInformation: UpdateInformationStore
     @EnvironmentObject private var localization: LocalizationStore
 
@@ -186,7 +166,6 @@ struct SettingsView: View {
     @State private var isMappingPermissionAlertPresented = false
     @State private var isWaitingForMappingPermissions = false
     @State private var webRemoteInviteCode = ""
-    @State private var privateFeatureEntryReveal = PrivateFeatureEntryRevealState()
     private static let requiredWebRemoteInviteCode = "8586"
 
     init(
@@ -199,7 +178,6 @@ struct SettingsView: View {
     ) {
         self.model = model
         settings = model.settings
-        privateFeature = model.privateFeature
         self.updateInformation = updateInformation
         _selectedSection = State(initialValue: initialSection)
         self.checkForUpdates = checkForUpdates
@@ -224,11 +202,6 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshPermissionStates()
             resumeCustomMappingIfPermissionsGranted()
-        }
-        .onReceive(privateFeature.$isFeatureVisible.removeDuplicates()) { isVisible in
-            if !isVisible, selectedSection == .privateFeature {
-                selectedSection = .about
-            }
         }
         .sheet(isPresented: $isReleaseHistoryPresented) {
             ReleaseHistorySheet()
@@ -397,9 +370,7 @@ struct SettingsView: View {
     }
 
     private var visibleSections: [SettingsSection] {
-        SettingsSection.allCases.filter {
-            $0 != .privateFeature || privateFeature.isFeatureVisible
-        }
+        SettingsSection.allCases
     }
 
     private func sidebarButton(_ section: SettingsSection) -> some View {
@@ -407,17 +378,10 @@ struct SettingsView: View {
             selectedSection = section
         } label: {
             VStack(spacing: 7) {
-                Image(systemName: section == .privateFeature
-                    ? privateFeature.sectionSystemImage
-                    : section.systemImage)
+                Image(systemName: section.systemImage)
                     .font(.system(size: 21, weight: .semibold))
-                if section == .privateFeature {
-                    Text(privateFeature.sectionTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                } else {
-                    Text(section.title)
-                        .font(.system(size: 13, weight: .semibold))
-                }
+                Text(section.title)
+                    .font(.system(size: 13, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
@@ -435,12 +399,6 @@ struct SettingsView: View {
         switch selectedSection {
         case .connection:
             connectionPage
-        case .privateFeature:
-            if privateFeature.isFeatureVisible {
-                privateFeature.settingsView()
-            } else {
-                aboutPage
-            }
         case .mapping:
             mappingPage
         case .statistics:
@@ -2462,7 +2420,6 @@ struct SettingsView: View {
                                             .font(.system(size: 28, weight: .semibold))
                                             .monospacedDigit()
                                             .contentShape(Rectangle())
-                                            .onTapGesture(perform: registerPrivateFeatureVersionTap)
                                     }
 
                                     if case let .available(update) = updateInformation.state {
@@ -2551,10 +2508,6 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                    }
-
-                    if privateFeature.shouldShowEnrollment {
-                        privateFeature.enrollmentView()
                     }
 
                     GlassPanel {
@@ -2781,13 +2734,6 @@ struct SettingsView: View {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? localization.text("common.value.unknown")
-    }
-
-    private func registerPrivateFeatureVersionTap() {
-        guard privateFeature.isAvailable else { return }
-        if privateFeatureEntryReveal.registerVersionTap() {
-            privateFeature.revealEnrollment()
-        }
     }
 
     private func languageTitle(_ language: AppLanguage) -> String {

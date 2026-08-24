@@ -58,16 +58,15 @@ RELEASE_VARIANT=intel ./scripts/verify-dmg.sh
 
 日常 `macOS CI` 与预览候选 workflow 会分别构建 Apple Silicon 和 Intel 产物。正式签名、公证打包使用 `macOS Signed Release Packages` workflow，并限制在受保护的 `mac-release` Environment。该 Environment 需要配置：
 
-- `SAYALL_AI_DEPLOY_KEY`
 - `RELEASE_CREDENTIALS_DEPLOY_KEY`
 - `APPLE_SIGNING_MATCH_DEPLOY_KEY`
 - `RELEASE_AGE_IDENTITY`
 - `REMOTE_WEB_RELAY_URL`
 - `EARLY_ACCESS_SERVICE_URL`
 
-`SAYALL_AI_DEPLOY_KEY` 可以继续作为仓库 Secret；其余发布值应放在受保护的 `mac-release` Environment。Developer ID 身份只从只读 Match 仓库同步，P8、Match 密码和 Sparkle 私钥只以 age 密文存在于独立私有凭据仓库；Environment 仅保存专用 age 身份和两把只读部署密钥。解密文件只存在于临时 Runner 与临时 Keychain，不写入源码、缓存或 Actions Artifact。workflow 输出两套独立的已签名、公证、stapled 产物；发布与稳定晋升仍由候选溯源门禁处理。
+其余发布值应放在受保护的 `mac-release` Environment。Developer ID 身份只从只读 Match 仓库同步，P8、Match 密码和 Sparkle 私钥只以 age 密文存在于独立私有凭据仓库；Environment 仅保存专用 age 身份和两把只读部署密钥。解密文件只存在于临时 Runner 与临时 Keychain，不写入源码、缓存或 Actions Artifact。workflow 输出两套独立的已签名、公证、stapled 产物；发布与稳定晋升仍由候选溯源门禁处理。
 
-正式 workflow 必须注入真实 SayAll AI 私有包并在两种发行变体下运行测试。私有包的最低平台必须保持为 macOS 13 或更低；只验证未注入私有包的公开构建不能证明 Intel 生产包可用。
+正式 workflow 在两种发行变体下运行测试；签名和公证仍只依赖受保护的发布凭据。
 
 ## 当前状态
 

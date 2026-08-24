@@ -194,8 +194,11 @@ check(
     },
     "all known buttons have defaults"
 )
+let xiaomiUsageMap = Dictionary(uniqueKeysWithValues: RemoteBackendKind.xiaomi.supportedButtons.map {
+    ($0.hidUsage, $0)
+})
 check(
-    RemoteButton.usageMap == [
+    xiaomiUsageMap == [
         0x28: .ok,
         0x35: .tv,
         0x4A: .home,

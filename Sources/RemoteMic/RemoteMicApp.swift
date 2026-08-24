@@ -143,7 +143,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         observeLocalization()
         observePhoneRemoteButtonTitles()
         installWorkspaceAudioLifecycleObservers()
-        model.privateFeature.refreshAccessIfNeeded()
         if OnboardingLaunchPolicy.shouldStartRuntime(
             isComplete: model.settings.isOnboardingComplete,
             step: model.settings.onboardingStep
@@ -193,7 +192,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        model.privateFeature.hideHUDImmediately()
         model.stop()
         updateFeedRefreshTask?.cancel()
         updateFeedRefreshTimer?.invalidate()
@@ -207,10 +205,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         workspaceAudioLifecycleObservers.forEach(workspaceNotificationCenter.removeObserver)
         workspaceAudioLifecycleObservers.removeAll()
         AppLogger.shared.write("SYSTEM AUDIO observers_stopped")
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        model.privateFeature.refreshAccessIfNeeded()
     }
 
     func applicationShouldHandleReopen(
@@ -252,7 +246,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
                     guard let self else { return }
                     self.model.handleSystemAudioLifecycle(event)
                     if event == .systemDidWake {
-                        self.model.privateFeature.refreshAccessIfNeeded()
                     }
                 }
             }
@@ -430,17 +423,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         }
         .store(in: &subscriptions)
 
-        model.privateFeature.$hudShouldBeVisible
-        .removeDuplicates()
-        .receive(on: RunLoop.main)
-        .sink { [weak self] isVisible in
-            self?.setPrivateFeatureHUDVisible(isVisible)
-        }
-        .store(in: &subscriptions)
-    }
-
-    private func setPrivateFeatureHUDVisible(_ isVisible: Bool) {
-        model.privateFeature.setHUDVisible(isVisible)
     }
 
     private func observeLocalization() {
@@ -450,9 +432,6 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
                 guard let self else { return }
                 self.statusItem?.button?.toolTip = self.localization.text("app.name")
                 self.settingsWindowController?.window?.title = self.localization.text("app.name")
-                self.model.privateFeature.updateLocaleIdentifier(
-                    self.localization.locale.identifier
-                )
                 self.configureApplicationMenu()
                 self.rebuildStatusMenu()
                 self.updateInformation.reloadReleaseNotes(

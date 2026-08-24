@@ -14,18 +14,6 @@ let macOSPlatform: SupportedPlatform = ProcessInfo.processInfo.environment["RELE
     ? .macOS(.v13)
     : .macOS(.v14)
 
-if let privateFeaturePath = ProcessInfo.processInfo.environment[
-    "SAYALL_AI_PACKAGE_PATH"
-], !privateFeaturePath.isEmpty {
-    let packageIdentity = URL(fileURLWithPath: privateFeaturePath)
-        .lastPathComponent
-        .lowercased()
-    packageDependencies.append(.package(path: privateFeaturePath))
-    remoteMicDependencies.append(
-        .product(name: "SayAllAI", package: packageIdentity)
-    )
-}
-
 if let hardwareSimulationPath = ProcessInfo.processInfo.environment[
     "REMOTE_MIC_HARDWARE_SIMULATION_PATH"
 ], !hardwareSimulationPath.isEmpty {

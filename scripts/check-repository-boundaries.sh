@@ -51,8 +51,7 @@ if git grep -n -I -E \
   'TODO.md' \
   'feature/**' \
   'Testing/**' \
-  'Bugs/**' \
-  ':(exclude)Sources/RemoteMic/PrivateFeatureIntegration.swift'; then
+  'Bugs/**'; then
   print -u2 "private feature implementation detail returned to the public tree"
   exit 1
 fi
