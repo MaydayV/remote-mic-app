@@ -429,8 +429,20 @@ struct BuildSigningTests {
             ),
             encoding: .utf8
         )
+        let publishSource = try String(
+            contentsOf: root.appendingPathComponent("scripts/publish-release.sh"),
+            encoding: .utf8
+        )
 
         #expect(workflowSource.contains("workflow_dispatch:"))
+        #expect(workflowSource.contains("workflow_run:"))
+        #expect(workflowSource.contains("macOS Preview Candidate"))
+        #expect(workflowSource.contains("github.event.workflow_run.conclusion == 'success'"))
+        #expect(workflowSource.contains("contents: write"))
+        #expect(workflowSource.contains("actions: write"))
+        #expect(workflowSource.contains("git tag -a \"$RELEASE_TAG\""))
+        #expect(workflowSource.contains("publish-release.sh prerelease"))
+        #expect(workflowSource.contains("RELEASE_CANDIDATE_BRANCH"))
         #expect(workflowSource.contains("environment: mac-release"))
         #expect(workflowSource.contains("RELEASE_CREDENTIALS_DEPLOY_KEY"))
         #expect(workflowSource.contains("APPLE_SIGNING_MATCH_DEPLOY_KEY"))
@@ -449,5 +461,7 @@ struct BuildSigningTests {
         #expect(!workflowSource.contains("SPARKLE_PRIVATE_KEY_BASE64"))
         #expect(!workflowSource.contains("pull_request:"))
         #expect(!workflowSource.contains("push:"))
+        #expect(publishSource.contains("## What's New"))
+        #expect(publishSource.contains("Resources/en.lproj/ReleaseHistory.md"))
     }
 }

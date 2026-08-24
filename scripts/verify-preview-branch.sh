@@ -5,7 +5,7 @@ umask 077
 ROOT="${0:A:h:h}"
 PLIST="$ROOT/Resources/Info.plist"
 BASE_REF="origin/main"
-BRANCH="${GITHUB_REF_NAME:-}"
+BRANCH="${RELEASE_CANDIDATE_BRANCH:-${GITHUB_REF_NAME:-}}"
 
 if [[ "$#" -ne 0 ]]; then
   print -u2 "usage: $0"

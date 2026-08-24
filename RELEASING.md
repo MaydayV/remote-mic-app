@@ -15,11 +15,12 @@
 2. 从最新 `origin/main` 创建 `release/pre-vX.Y.Z`。
 3. 只修改 `Resources/Info.plist`、中英文 `ReleaseHistory.md`，以及确有必要的 `Testing/*.md` 目标版本。
 4. Push 候选分支。GitHub Actions 自动执行分支来源校验、Swift Testing、Self Test、Release 编译和临时 App 打包。
-5. 使用受信任发布机的 readonly Match、随机密码隔离 Keychain、独立 P8 凭据仓库和 Sparkle 私钥完成签名、公证与正式候选制品构建。
-6. Tag、远端候选分支和发布资产必须解析到同一个提交。GitHub Release 必须保持 Pre-release，稳定 `latest` 不得变化。
-7. 从公开 Release 重新下载全部资产并逐字节复核；使用公开稳定版执行固定候选 appcast 的真实 Sparkle 更新。
+5. 预览候选 CI 成功后，受保护的 `mac-release` 环境会自动创建匹配 Tag，使用 readonly Match、随机密码隔离 Keychain、独立 P8 凭据仓库和 Sparkle 私钥完成签名、公证，并自动创建 GitHub Pre-release。
+6. 发布说明从该版本的中英文 `ReleaseHistory.md` 自动提取，GitHub Release 同时包含中文和英文更新内容；缺少任一语言的版本条目会阻止发布。
+7. Tag、远端候选分支和发布资产必须解析到同一个提交。GitHub Release 必须保持 Pre-release，稳定 `latest` 不得变化。
+8. 发布脚本会重新下载全部公开资产并逐字节复核；使用公开稳定版执行固定候选 appcast 的真实 Sparkle 更新。
 
-GitHub 自动生成的 CI App 只用于验证打包结构，不是已签名、公证的公开安装包。完整签名发布在受保护的 CI 发布环境完成前，继续使用既有无交互发布机流程。
+GitHub 自动生成的 CI App 只用于验证打包结构，不是公开安装包。自动签名发布依赖 `mac-release` Environment 中已有的受保护凭据；凭据缺失时工作流会失败且不会生成可下载的公开安装包。
 
 ## 正式晋升
 

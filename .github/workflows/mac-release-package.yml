@@ -1,6 +1,9 @@
 name: macOS Signed Release Packages
 
 on:
+  workflow_run:
+    workflows: ["macOS Preview Candidate"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
@@ -9,21 +12,27 @@ on:
         type: string
 
 concurrency:
-  group: mac-signed-package-${{ inputs.tag }}
+  group: mac-signed-package-${{ inputs.tag || github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 jobs:
   package:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       startsWith(github.event.workflow_run.head_branch, 'release/pre-v'))
     name: Sign and notarize Apple Silicon and Intel packages
     runs-on: macos-15
     timeout-minutes: 180
     environment: mac-release
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-      RELEASE_TAG: ${{ inputs.tag }}
       EXPECTED_DEVELOPER_TEAM_ID: 34T8V3NA4P
       REMOTE_WEB_RELAY_URL: ${{ secrets.REMOTE_WEB_RELAY_URL }}
       EARLY_ACCESS_SERVICE_URL: ${{ secrets.EARLY_ACCESS_SERVICE_URL }}
@@ -32,7 +41,51 @@ jobs:
       - name: Check out release candidate
         uses: actions/checkout@v5
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
+
+      - name: Resolve candidate branch, version, and tag
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          WORKFLOW_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            candidate_branch="$WORKFLOW_BRANCH"
+            expected_sha="$WORKFLOW_SHA"
+          else
+            candidate_branch="$GITHUB_REF_NAME"
+            expected_sha="$(git rev-parse HEAD)"
+          fi
+          if [[ ! "$candidate_branch" =~ ^release/pre-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "release workflow requires a release/pre-vX.Y.Z candidate branch" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$expected_sha"
+          git switch -C "$candidate_branch"
+          version="${candidate_branch#release/pre-v}"
+          tag="${REQUESTED_TAG:-v$version}"
+          test "$tag" = "v$version"
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_CANDIDATE_BRANCH=$candidate_branch" >> "$GITHUB_ENV"
+          echo "candidate_branch=$candidate_branch" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Validate candidate and create matching tag
+        run: |
+          ./scripts/verify-preview-branch.sh
+          remote_tag_commit="$(git ls-remote origin "refs/tags/$RELEASE_TAG^{}" | awk 'NR == 1 { print $1 }')"
+          if [[ -z "$remote_tag_commit" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" -m "Remote Mic ${RELEASE_TAG#v}"
+            git push origin "refs/tags/$RELEASE_TAG"
+          elif [[ "$remote_tag_commit" != "$(git rev-parse HEAD)" ]]; then
+            echo "existing tag $RELEASE_TAG does not point to candidate HEAD" >&2
+            exit 1
+          fi
 
       - name: Check out readonly release credentials
         uses: actions/checkout@v5
@@ -92,10 +145,15 @@ jobs:
       - name: Sign, notarize, staple, and verify both variants
         run: ./scripts/package-macos-release-in-actions.sh
 
+      - name: Publish signed GitHub pre-release and verify assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/publish-release.sh prerelease
+
       - name: Upload signed release packages
         uses: actions/upload-artifact@v4
         with:
-          name: remote-mic-${{ inputs.tag }}-signed-macos
+          name: remote-mic-${{ steps.release.outputs.tag }}-signed-macos
           path: |
             dist/Remote-Mic-*.dmg
             dist/Remote-Mic-*.dmg.sha256

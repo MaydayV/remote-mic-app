@@ -189,7 +189,7 @@
   - “关于”页提供默认关闭的预发布更新开关；仅在用户主动开启后，Sparkle 自动与手动检查才会包含最新候选版本。
   - v1.7.3 修复预发布源解析失败或缓存旧地址时阻断正式版检查的问题；预发布源不可用时必须清除旧地址并回退到稳定更新源。
   - 候选版本不存在、GitHub API 限流、网络超时或候选源暂不可用时静默忽略，不显示错误弹窗；手动检查继续使用稳定源。
-  - macOS 候选统一使用从最新 `main` 创建的 `release/pre-vX.Y.Z` 分支；功能必须先合入 `main`，候选分支只保留一个版本、ReleaseHistory 和测试说明提交，禁止从旧预览分支或 Tag 串联下一候选。Push 后由 GitHub Actions 自动完成来源校验、完整 Mac 测试和临时 App 打包，正式签名、公证与公开发布继续经过受保护发布流程。
+  - macOS 候选统一使用从最新 `main` 创建的 `release/pre-vX.Y.Z` 分支；功能必须先合入 `main`，候选分支只保留一个版本、ReleaseHistory 和测试说明提交，禁止从旧预览分支或 Tag 串联下一候选。Push 后由 GitHub Actions 自动完成来源校验、完整 Mac 测试、签名、公证、安装包上传和 GitHub Pre-release 发布，更新说明从中英文 ReleaseHistory 自动生成。
   - Pre-release 资产完成发布和下载字节校验后，由 Release Guard 创建候选分支到 `main` 的 PR，并在 Apple Silicon、Intel 必需检查通过后自动合并；这只把候选提交记录回 `main`，不会把 GitHub Release 晋升为正式版。下一预览版必须从回流后的最新 `main` 创建。
   - 正式版只能选择已经发布并验证过的 Pre-release，复用完全相同的 Tag、签名、公证资产和摘要；候选回流 `main` 不构成正式发布授权，禁止从 `main` 重建正式资产。
 - [ ] 在“关于”页集中展示版本与更新信息

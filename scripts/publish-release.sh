@@ -186,9 +186,17 @@ generate_release_notes() {
       active && /^## / { exit }
       active { print }
     ' "$ROOT/Resources/zh-Hans.lproj/ReleaseHistory.md"
+    print
+    print "## What's New"
+    print
+    /usr/bin/awk -v version="$VERSION" '
+      index($0, "## " version) == 1 { active = 1; next }
+      active && /^## / { exit }
+      active { print }
+    ' "$ROOT/Resources/en.lproj/ReleaseHistory.md"
   } > "$RELEASE_NOTES"
 
-  rg -q '^- ' "$RELEASE_NOTES"
+  test "$(rg -c '^- ' "$RELEASE_NOTES")" -ge 2
 }
 
 generate_candidate_provenance() {
