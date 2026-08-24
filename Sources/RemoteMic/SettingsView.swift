@@ -376,9 +376,18 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            WindowDragArea()
+            ZStack(alignment: .bottom) {
+                WindowDragArea()
+
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 36, height: 36)
+                    .padding(.bottom, 8)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
                 .frame(height: 56)
-                .accessibilityHidden(true)
             ForEach(visibleSections) { section in
                 sidebarButton(section)
             }
