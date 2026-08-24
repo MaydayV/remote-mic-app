@@ -195,11 +195,24 @@ struct BuildSigningTests {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = [lifecycleScript.path]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
         try process.run()
         process.waitUntilExit()
-        #expect(process.terminationStatus == 0)
+        let output = String(
+            data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+        let error = String(
+            data: errorPipe.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+        #expect(
+            process.terminationStatus == 0,
+            "preview lifecycle output:\n\(output)\nerror:\n\(error)"
+        )
     }
 
     @Test func intelVenturaReleaseLineStaysIsolatedFromAppleSilicon() throws {
