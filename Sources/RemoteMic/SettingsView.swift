@@ -791,11 +791,7 @@ struct SettingsView: View {
     private var siriRemoteConnectionPanel: some View {
         GlassPanel {
             VStack(spacing: 16) {
-                HStack(spacing: 10) {
-                    Image(systemName: "apple.logo")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 30)
+                HStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("remote.backend.siri_short_name")
                             .font(.system(size: 13, weight: .semibold))
