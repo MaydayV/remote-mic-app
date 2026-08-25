@@ -315,6 +315,9 @@ struct BluetoothLifecycleTests {
         #expect(XiaomiVoiceRemoteNameMatcher.matches("xiaomi bluetooth remote 2 pro"))
         #expect(XiaomiVoiceRemoteNameMatcher.matches("小米蓝牙语音遥控器"))
         #expect(XiaomiVoiceRemoteNameMatcher.matches(" 小米蓝牙语音遥控器 "))
+        #expect(XiaomiVoiceRemoteNameMatcher.matches("小米蓝牙遥控器2"))
+        #expect(XiaomiVoiceRemoteNameMatcher.matches("小米蓝牙遥控器2 Pro"))
+        #expect(XiaomiVoiceRemoteNameMatcher.matches("ARN9"))
     }
 
     @Test func nameMatcherRejectsBlankNilAndSimilarNonTargetNames() {

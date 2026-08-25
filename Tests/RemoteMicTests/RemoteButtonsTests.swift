@@ -2410,6 +2410,7 @@ struct RemoteButtonsTests {
     @Test func remoteModelNumberIdentificationIsStrictAndCaseInsensitive() {
         #expect(XiaomiRemoteModel.identified(by: "RC001") == .rc001)
         #expect(XiaomiRemoteModel.identified(by: " rc003\n") == .rc003)
+        #expect(XiaomiRemoteModel.identified(by: "ARN9") == .rc003)
         #expect(XiaomiRemoteModel.identified(by: "RC002") == nil)
         #expect(XiaomiRemoteModel.identified(by: "2BED") == nil)
     }

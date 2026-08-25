@@ -50,6 +50,12 @@ struct ATVVProtocolTests {
         #expect(decoder.decode(Data([0x7F])) == [11, -19])
     }
 
+    @Test func decoderSupportsARN9LowNibbleFirstFrames() {
+        let decoder = IMAADPCMDecoder()
+        decoder.lowNibbleFirst = true
+        #expect(decoder.decode(Data([0x7F])) == [-11, 19])
+    }
+
     @Test func decoderClampsState() {
         let decoder = IMAADPCMDecoder()
         decoder.reset(predictor: 100_000, stepIndex: 1_000)
