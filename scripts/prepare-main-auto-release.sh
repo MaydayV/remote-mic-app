@@ -74,8 +74,6 @@ while git ls-remote --exit-code --refs origin "refs/tags/$release_tag" >/dev/nul
   fi
 done
 commit_sha="$(git rev-parse HEAD)"
-commit_short_sha="$(git rev-parse --short=7 HEAD)"
-commit_subject="$(git log -1 --format=%s)"
 
 /usr/bin/plutil -replace CFBundleShortVersionString -string "$version" "$PLIST"
 /usr/bin/plutil -replace CFBundleVersion -string "$build" "$PLIST"
@@ -84,11 +82,11 @@ for locale in zh-Hans en; do
   history_path="$ROOT/Resources/$locale.lproj/ReleaseHistory.md"
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   if [[ "$locale" == "zh-Hans" ]]; then
-    first_note="自动发布：$commit_subject"
-    second_note="本次构建提交：$commit_short_sha"
+    first_note="修复已知问题，提升遥控器兼容性与运行稳定性。"
+    second_note="优化更新流程与界面体验。"
   else
-    first_note="Automatic release: $commit_subject"
-    second_note="Build commit: $commit_short_sha"
+    first_note="Fixed known issues and improved remote compatibility and runtime stability."
+    second_note="Refined the update flow and overall interface experience."
   fi
   {
     print "## $version"

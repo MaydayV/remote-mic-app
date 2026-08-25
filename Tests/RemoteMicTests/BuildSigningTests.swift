@@ -403,9 +403,9 @@ struct BuildSigningTests {
         )
 
         for requiredText in [
-            "SPARKLE_NOTES=\"$SPARKLE_ARCHIVES/${ZIP_BASENAME:r}.txt\"",
-            "--embed-release-notes",
-            "--full-release-notes-url \"$RELEASE_PAGE\"",
+            "Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.zh.txt",
+            "Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.en.txt",
+            "--release-notes-url-prefix \"$CDN_DOWNLOAD_PREFIX\"",
         ] {
             #expect(notarizeSource.contains(requiredText))
         }
@@ -415,12 +415,12 @@ struct BuildSigningTests {
         #expect(publishSource.contains("Remote-Mic-$VERSION-AppleSilicon-Uninstaller.pkg"))
         #expect(publishSource.contains("Remote-Mic-$VERSION-Intel-Installer.pkg"))
         #expect(publishSource.contains("Remote-Mic-$VERSION-Intel-Uninstaller.pkg"))
-        #expect(!publishSource.contains("$STAGING_DIR/${ZH_RELEASE_NOTES:t}"))
-        #expect(!publishSource.contains("$STAGING_DIR/${EN_RELEASE_NOTES:t}"))
-        #expect(!publishSource.contains("$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"))
-        #expect(!publishSource.contains("$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"))
-        #expect(publishSource.contains(".payloadAssets | length' \"$CANDIDATE_PROVENANCE\")\" = \"12\""))
-        #expect(publishSource.contains("= \"13\""))
+        #expect(publishSource.contains("$STAGING_DIR/${ZH_RELEASE_NOTES:t}"))
+        #expect(publishSource.contains("$STAGING_DIR/${EN_RELEASE_NOTES:t}"))
+        #expect(publishSource.contains("$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"))
+        #expect(publishSource.contains("$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"))
+        #expect(publishSource.contains(".payloadAssets | length' \"$CANDIDATE_PROVENANCE\")\" = \"16\""))
+        #expect(publishSource.contains("= \"17\""))
         #expect(publishSource.contains("== 12 or (.payloadAssets | length) == 14 or (.payloadAssets | length) == 16"))
         #expect(publishSource.contains("candidate-provenance.json"))
         #expect(notarizeSource.contains("GITHUB_DOWNLOAD_PREFIX=\"https://github.com/MaydayV/remote-mic-app/releases/download/$RELEASE_TAG/\""))

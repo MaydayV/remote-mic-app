@@ -631,6 +631,7 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
             displayVersion: item.displayVersionString,
             buildVersion: item.versionString,
             archiveURL: item.fileURL,
+            releaseNotesURL: item.releaseNotesURL,
             fallbackDescription: item.itemDescription,
             localeIdentifier: localization.locale.identifier
         )

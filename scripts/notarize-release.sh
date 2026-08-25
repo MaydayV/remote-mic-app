@@ -16,6 +16,8 @@ UNINSTALL_PACKAGE="$OUTPUT_DIR/$RELEASE_UNINSTALL_PACKAGE_NAME"
 DMG="$OUTPUT_DIR/Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.dmg"
 UPDATE_ZIP="$OUTPUT_DIR/Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.zip"
 APPCAST="$OUTPUT_DIR/$RELEASE_APPCAST_NAME"
+ZH_RELEASE_NOTES="$OUTPUT_DIR/Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.zh.txt"
+EN_RELEASE_NOTES="$OUTPUT_DIR/Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.en.txt"
 ZIP_BASENAME="${UPDATE_ZIP:t}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:?Set CODE_SIGN_IDENTITY to a Developer ID Application identity}"
 INSTALLER_SIGNING_IDENTITY="${INSTALLER_SIGNING_IDENTITY:?Set INSTALLER_SIGNING_IDENTITY to a Developer ID Installer identity}"
@@ -94,6 +96,8 @@ fi
 WORK_DIR="$(/usr/bin/mktemp -d /private/tmp/remotemic-notarize-release.XXXXXX)"
 APP_NOTARY_ZIP="$WORK_DIR/Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX-notarization.zip"
 SPARKLE_ARCHIVES="$WORK_DIR/sparkle-archives"
+ZH_NOTES_BASENAME="${ZH_RELEASE_NOTES:t}"
+EN_NOTES_BASENAME="${EN_RELEASE_NOTES:t}"
 
 cleanup() {
   case "$WORK_DIR" in
@@ -186,31 +190,20 @@ if [[ "$GENERATE_SPARKLE_UPDATE" == "1" ]]; then
     "$OUTPUT_DIR"/appcast.xml|"$OUTPUT_DIR"/appcast-intel.xml) ;;
     *) print -u2 "refusing to replace unexpected appcast path: $APPCAST"; exit 1 ;;
   esac
-  /bin/rm -f -- "$UPDATE_ZIP" "$APPCAST"
+  /bin/rm -f -- "$UPDATE_ZIP" "$APPCAST" "$ZH_RELEASE_NOTES" "$EN_RELEASE_NOTES"
   /usr/bin/ditto -c -k --keepParent "$APP" "$UPDATE_ZIP"
   /bin/mkdir -p "$SPARKLE_ARCHIVES"
   /usr/bin/ditto --norsrc --noqtn --noacl "$UPDATE_ZIP" "$SPARKLE_ARCHIVES/$ZIP_BASENAME"
-  SPARKLE_NOTES="$SPARKLE_ARCHIVES/${ZIP_BASENAME:r}.txt"
-  ZH_NOTES="$WORK_DIR/zh-notes.txt"
-  EN_NOTES="$WORK_DIR/en-notes.txt"
   extract_release_notes \
     "$ROOT/Resources/zh-Hans.lproj/ReleaseHistory.md" \
-    "$ZH_NOTES"
+    "$SPARKLE_ARCHIVES/$ZH_NOTES_BASENAME"
   extract_release_notes \
     "$ROOT/Resources/en.lproj/ReleaseHistory.md" \
-    "$EN_NOTES"
-  {
-    print "中文更新内容"
-    /bin/cat "$ZH_NOTES"
-    print
-    print "What's New"
-    /bin/cat "$EN_NOTES"
-  } > "$SPARKLE_NOTES"
+    "$SPARKLE_ARCHIVES/$EN_NOTES_BASENAME"
   "$GENERATE_APPCAST" \
     --ed-key-file "$SPARKLE_PRIVATE_KEY_FILE" \
     --download-url-prefix "$CDN_DOWNLOAD_PREFIX" \
-    --embed-release-notes \
-    --full-release-notes-url "$RELEASE_PAGE" \
+    --release-notes-url-prefix "$CDN_DOWNLOAD_PREFIX" \
     --link "$RELEASE_PAGE" \
     --versions "$BUILD" \
     --maximum-versions 1 \
@@ -219,12 +212,16 @@ if [[ "$GENERATE_SPARKLE_UPDATE" == "1" ]]; then
   ENCLOSURE_SIGNATURE="$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' "$APPCAST" | head -n 1)"
   test -n "$ENCLOSURE_SIGNATURE"
   rg -Fq "url=\"$CDN_DOWNLOAD_PREFIX$ZIP_BASENAME\"" "$APPCAST"
-  ! rg -q '<sparkle:releaseNotesLink>' "$APPCAST"
-  rg -q '<description' "$APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX$ZH_NOTES_BASENAME" "$APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX$EN_NOTES_BASENAME" "$APPCAST"
   rg -Fq "<sparkle:version>$BUILD</sparkle:version>" "$APPCAST"
   "$SIGN_UPDATE" --verify --ed-key-file "$SPARKLE_PRIVATE_KEY_FILE" "$UPDATE_ZIP" "$ENCLOSURE_SIGNATURE"
   "$SIGN_UPDATE" --ed-key-file "$SPARKLE_PRIVATE_KEY_FILE" "$APPCAST"
   "$SIGN_UPDATE" --verify --ed-key-file "$SPARKLE_PRIVATE_KEY_FILE" "$APPCAST"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$SPARKLE_ARCHIVES/$ZH_NOTES_BASENAME" "$ZH_RELEASE_NOTES"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$SPARKLE_ARCHIVES/$EN_NOTES_BASENAME" "$EN_RELEASE_NOTES"
 fi
 
 print "NOTARIZED RELEASE READY"
@@ -237,6 +234,8 @@ print "UNINSTALL PACKAGE: $UNINSTALL_PACKAGE"
 if [[ "$GENERATE_SPARKLE_UPDATE" == "1" ]]; then
   print "SPARKLE ZIP: $UPDATE_ZIP"
   print "APPCAST: $APPCAST"
+  print "ZH RELEASE NOTES: $ZH_RELEASE_NOTES"
+  print "EN RELEASE NOTES: $EN_RELEASE_NOTES"
 else
   print "SPARKLE UPDATE: skipped for private test package"
 fi

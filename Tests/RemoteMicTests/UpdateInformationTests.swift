@@ -115,6 +115,16 @@ struct UpdateInformationTests {
             )?.absoluteString
                 == "https://github.com/MaydayV/remote-mic-app/releases/download/v1.8.6/Remote-Mic-1.8.6.en.txt"
         )
+        let appleSiliconArchiveURL = try #require(URL(
+            string: "https://github.com/MaydayV/remote-mic-app/releases/download/v1.8.15/Remote-Mic-1.8.15-AppleSilicon.zip"
+        ))
+        #expect(
+            UpdateReleaseNotes.assetURL(
+                for: appleSiliconArchiveURL,
+                displayVersion: "1.8.15",
+                localeIdentifier: "zh-Hans"
+            )?.lastPathComponent == "Remote-Mic-1.8.15-AppleSilicon.zh.txt"
+        )
         #expect(UpdateReleaseNotes.assetURL(
             for: URL(string: "https://example.com/Remote-Mic-1.8.6.zip")!,
             displayVersion: "1.8.6",
@@ -132,6 +142,36 @@ struct UpdateInformationTests {
             "First user-visible improvement",
             "Second user-visible fix",
         ])
+    }
+
+    @Test func releaseNotesParserSelectsTheCurrentLanguageSection() {
+        let embeddedNotes = """
+        中文更新内容
+        - 修复中文更新说明
+
+        What's New
+        - English release note
+        """
+
+        #expect(UpdateReleaseNotes.parse(
+            embeddedNotes,
+            localeIdentifier: "zh-Hans"
+        ) == ["修复中文更新说明"])
+        #expect(UpdateReleaseNotes.parse(
+            embeddedNotes,
+            localeIdentifier: "en-US"
+        ) == ["English release note"])
+    }
+
+    @Test func chineseReleaseNotesDoNotFallBackToEnglishText() {
+        #expect(UpdateReleaseNotes.parse(
+            "- 中文更新内容",
+            localeIdentifier: "zh-Hans"
+        ) == ["中文更新内容"])
+        #expect(UpdateReleaseNotes.parse(
+            "What's New\n- English-only release note",
+            localeIdentifier: "zh-Hans"
+        ).isEmpty)
     }
 
     @Test @MainActor func storeReloadsNotesForTheSelectedLanguage() async throws {
@@ -178,6 +218,99 @@ struct UpdateInformationTests {
             displayVersion: "1.8.6",
             buildVersion: "67",
             releaseNotes: ["English release note"]
+        )))
+    }
+
+    @Test @MainActor func storeReloadsEmbeddedNotesForTheSelectedLanguage() throws {
+        let store = UpdateInformationStore { _ in
+            throw UpdateFeedResolutionError.invalidResponse
+        }
+        let archiveURL = try #require(URL(
+            string: "https://github.com/MaydayV/remote-mic-app/releases/download/v1.8.15/Remote-Mic-1.8.15.zip"
+        ))
+        let embeddedNotes = """
+        中文更新内容
+        - 中文修复说明
+
+        What's New
+        - English fix description
+        """
+
+        store.setAvailable(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            archiveURL: archiveURL,
+            fallbackDescription: embeddedNotes,
+            localeIdentifier: "zh-Hans"
+        )
+        #expect(store.state == .available(AvailableUpdateInformation(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            releaseNotes: ["中文修复说明"]
+        )))
+
+        store.reloadReleaseNotes(localeIdentifier: "en-US")
+        #expect(store.state == .available(AvailableUpdateInformation(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            releaseNotes: ["English fix description"]
+        )))
+    }
+
+    @Test @MainActor func storePrefersSparkleLocalizedReleaseNotesURL() async throws {
+        let store = UpdateInformationStore { url in
+            guard [
+                "Remote-Mic-1.8.15-AppleSilicon.zh.txt",
+                "Remote-Mic-1.8.15-AppleSilicon.en.txt",
+            ].contains(url.lastPathComponent) else {
+                throw UpdateFeedResolutionError.invalidResponse
+            }
+            return url.pathExtension == "txt" && url.lastPathComponent.hasSuffix(".en.txt")
+                ? "- English localized note"
+                : "- Sparkle localized note"
+        }
+        let archiveURL = try #require(URL(
+            string: "https://github.com/MaydayV/remote-mic-app/releases/download/v1.8.15/Remote-Mic-1.8.15-AppleSilicon.zip"
+        ))
+        let releaseNotesURL = try #require(URL(
+            string: "https://github.com/MaydayV/remote-mic-app/releases/download/v1.8.15/Remote-Mic-1.8.15-AppleSilicon.zh.txt"
+        ))
+
+        store.setAvailable(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            archiveURL: archiveURL,
+            releaseNotesURL: releaseNotesURL,
+            fallbackDescription: nil,
+            localeIdentifier: "zh-Hans"
+        )
+        for _ in 0..<20 {
+            if store.state == .available(AvailableUpdateInformation(
+                displayVersion: "1.8.15",
+                buildVersion: "100082",
+                releaseNotes: ["Sparkle localized note"]
+            )) { break }
+            await Task.yield()
+        }
+        #expect(store.state == .available(AvailableUpdateInformation(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            releaseNotes: ["Sparkle localized note"]
+        )))
+
+        store.reloadReleaseNotes(localeIdentifier: "en-US")
+        for _ in 0..<20 {
+            if store.state == .available(AvailableUpdateInformation(
+                displayVersion: "1.8.15",
+                buildVersion: "100082",
+                releaseNotes: ["English localized note"]
+            )) { break }
+            await Task.yield()
+        }
+        #expect(store.state == .available(AvailableUpdateInformation(
+            displayVersion: "1.8.15",
+            buildVersion: "100082",
+            releaseNotes: ["English localized note"]
         )))
     }
 }

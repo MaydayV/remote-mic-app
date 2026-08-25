@@ -174,7 +174,7 @@ Sparkle `2.9.4` 通过 SwiftPM 嵌入应用。更新源和 EdDSA 公钥位于应
 
 候选版本先以 GitHub pre-release 发布。`notarize-release.sh` 使用固定 `RELEASE_TAG` 生成 appcast 的 GitHub 发布页，并让 enclosure ZIP 和本地化更新说明使用 `download.sayall.app/mac/releases/<tag>/` 的不可变 Cloudflare CDN 地址；发布脚本在 GitHub 资产可用后从 CDN 重新下载并逐字节比较，同时验证 `HEAD` 与 `Range`。应用内的 `SUFeedURL` 仍固定为 GitHub `releases/latest/download/appcast.xml`，旧安装用户不需要迁移 feed。GitHub 的 latest release 排除 draft 和 pre-release，因此默认关闭预发布检查的用户继续取得正式版本 appcast。用户在“关于”页主动开启预发布检查后，应用通过 GitHub 公共 Release API 解析最新一个带 `appcast.xml` 的非草稿 Release，并把其不可变资产 URL 作为 Sparkle 动态 feed；手动检查前会刷新，常驻运行时也会定期刷新。
 
-`scripts/publish-release.sh prerelease` 只接受干净、已推送且由同一远端 Tag 指向的源提交，发布 Apple Silicon 与 Intel 两套 ZIP、PKG、DMG、校验文件、更新说明和各自 appcast，并确认 pre-release 未改变 latest release。脚本随后从公开 Release 回下载全部 14 个分发资产并逐字节比较。测试机应使用与架构一致的 Sparkle CLI 单次 `--feed-url <候选版本 appcast URL>` 覆盖完成候选探测或更新，不写入持久化的 `SUFeedURL` 偏好；实际安装候选版本时需要处于已解锁的图形会话。
+`scripts/publish-release.sh prerelease` 只接受干净、已推送且由同一远端 Tag 指向的源提交，发布 Apple Silicon 与 Intel 两套 ZIP、PKG、DMG、校验文件、按语言区分的更新说明和各自 appcast，并确认 pre-release 未改变 latest release。脚本随后从公开 Release 回下载全部 16 个分发资产并逐字节比较。测试机应使用与架构一致的 Sparkle CLI 单次 `--feed-url <候选版本 appcast URL>` 覆盖完成候选探测或更新，不写入持久化的 `SUFeedURL` 偏好；实际安装候选版本时需要处于已解锁的图形会话。
 
 仅修改本地化文案或内置文档的低风险版本，在 `release/pre-v<版本>` 候选分支完成版本号、发布历史、commit 和 push 后，可使用 `ALLOW_ISOLATED_RELEASE_KEYCHAIN=1 ./scripts/fast-release.sh`。它会运行完整 Swift 测试、使用一次性 Keychain 分别签名并公证 Apple Silicon 与 Intel 产物，再发布 pre-release 并逐字节校验公开资产。正式晋升仍是独立授权步骤，必须在同一候选提交进入 `main` 后复用原始候选字节。快速命令只允许明确的文档和资源白名单，且 `Info.plist` 只能改变显示版本与 build number；发现 Swift、蓝牙、音频、安装器或发布流水线改动时会拒绝执行，必须走完整候选验收流程。
 

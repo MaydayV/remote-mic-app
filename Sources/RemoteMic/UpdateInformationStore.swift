@@ -85,18 +85,60 @@ enum UpdateReleaseNotes {
         let languageCode = languageCode(for: localeIdentifier)
         return updateArchiveURL
             .deletingLastPathComponent()
-            .appendingPathComponent("Remote-Mic-\(displayVersion).\(languageCode).txt")
+            .appendingPathComponent(
+                "\(updateArchiveURL.deletingPathExtension().lastPathComponent).\(languageCode).txt"
+            )
     }
 
-    static func parse(_ text: String) -> [String] {
-        text.split(whereSeparator: \Character.isNewline).compactMap { line in
+    static func parse(_ text: String, localeIdentifier: String? = nil) -> [String] {
+        let lines = text.split(whereSeparator: \Character.isNewline)
+        let selectedLines: ArraySlice<Substring>
+        if let localeIdentifier,
+           let section = localizedSection(in: lines, languageCode: languageCode(for: localeIdentifier)) {
+            selectedLines = section
+        } else {
+            selectedLines = lines[...]
+        }
+
+        return selectedLines.compactMap { line in
             var value = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if value.hasPrefix("- ") || value.hasPrefix("• ") {
+            let isBullet = value.hasPrefix("- ") || value.hasPrefix("• ")
+            if isBullet {
                 value.removeFirst(2)
             }
-            guard !value.isEmpty, !value.hasPrefix("#") else { return nil }
+            guard !value.isEmpty,
+                  !value.hasPrefix("#"),
+                  (isBullet || !isSectionHeading(value))
+            else { return nil }
             return value
         }
+    }
+
+    private static func localizedSection(
+        in lines: [Substring],
+        languageCode: String
+    ) -> ArraySlice<Substring>? {
+        let headings = languageCode == "zh"
+            ? ["中文更新内容", "更新内容"]
+            : ["What's New", "What’s New"]
+        guard let start = lines.firstIndex(where: { line in
+            headings.contains(line.trimmingCharacters(in: .whitespacesAndNewlines))
+        }) else {
+            // A legacy feed may contain only one language. Do not show English
+            // text in the Chinese UI when a Chinese section is absent.
+            let containsLanguageSections = lines.contains {
+                isSectionHeading($0.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            return languageCode == "zh" && containsLanguageSections ? [] : nil
+        }
+        let end = lines[(start + 1)...].firstIndex(where: { line in
+            isSectionHeading(line.trimmingCharacters(in: .whitespacesAndNewlines))
+        }) ?? lines.endIndex
+        return lines[start..<end]
+    }
+
+    private static func isSectionHeading(_ value: String) -> Bool {
+        ["中文更新内容", "更新内容", "What's New", "What’s New"].contains(value)
     }
 
     static func load(from url: URL) async throws -> String {
@@ -126,7 +168,8 @@ final class UpdateInformationStore: ObservableObject {
         let displayVersion: String
         let buildVersion: String
         let archiveURL: URL?
-        let fallbackNotes: [String]
+        let releaseNotesURL: URL?
+        let fallbackDescription: String?
     }
 
     private let notesLoader: NotesLoader
@@ -172,6 +215,7 @@ final class UpdateInformationStore: ObservableObject {
         displayVersion: String,
         buildVersion: String,
         archiveURL: URL?,
+        releaseNotesURL: URL? = nil,
         fallbackDescription: String?,
         localeIdentifier: String
     ) {
@@ -179,16 +223,38 @@ final class UpdateInformationStore: ObservableObject {
             displayVersion: displayVersion,
             buildVersion: buildVersion,
             archiveURL: archiveURL,
-            fallbackNotes: fallbackDescription.map(UpdateReleaseNotes.parse) ?? []
+            releaseNotesURL: releaseNotesURL,
+            fallbackDescription: fallbackDescription
         )
         pendingUpdate = pending
-        state = .available(information(for: pending, notes: pending.fallbackNotes))
-        loadReleaseNotes(for: pending, localeIdentifier: localeIdentifier)
+        state = .available(information(
+            for: pending,
+            notes: UpdateReleaseNotes.parse(
+                fallbackDescription ?? "",
+                localeIdentifier: localeIdentifier
+            )
+        ))
+        loadReleaseNotes(
+            for: pending,
+            localeIdentifier: localeIdentifier,
+            preferProvidedReleaseNotesURL: true
+        )
     }
 
     func reloadReleaseNotes(localeIdentifier: String) {
         guard let pendingUpdate else { return }
-        loadReleaseNotes(for: pendingUpdate, localeIdentifier: localeIdentifier)
+        state = .available(information(
+            for: pendingUpdate,
+            notes: UpdateReleaseNotes.parse(
+                pendingUpdate.fallbackDescription ?? "",
+                localeIdentifier: localeIdentifier
+            )
+        ))
+        loadReleaseNotes(
+            for: pendingUpdate,
+            localeIdentifier: localeIdentifier,
+            preferProvidedReleaseNotesURL: false
+        )
     }
 
     private func information(
@@ -204,18 +270,19 @@ final class UpdateInformationStore: ObservableObject {
 
     private func loadReleaseNotes(
         for pending: PendingUpdate,
-        localeIdentifier: String
+        localeIdentifier: String,
+        preferProvidedReleaseNotesURL: Bool
     ) {
         notesTask?.cancel()
-        // 新版 appcast 已将更新内容直接嵌入 itemDescription；只有历史
-        // appcast 没有内嵌说明时，才回退到旧版的 .txt 资产读取方式。
-        guard pending.fallbackNotes.isEmpty else { return }
-        guard let archiveURL = pending.archiveURL,
-              let notesURL = UpdateReleaseNotes.assetURL(
-                for: archiveURL,
+        let notesURL = (preferProvidedReleaseNotesURL ? pending.releaseNotesURL : nil) ??
+            pending.archiveURL.flatMap {
+            UpdateReleaseNotes.assetURL(
+                for: $0,
                 displayVersion: pending.displayVersion,
                 localeIdentifier: localeIdentifier
-              )
+            )
+        }
+        guard let notesURL
         else { return }
 
         notesGeneration += 1
@@ -228,7 +295,7 @@ final class UpdateInformationStore: ObservableObject {
                       generation == self.notesGeneration,
                       self.pendingUpdate == pending
                 else { return }
-                let notes = UpdateReleaseNotes.parse(text)
+                let notes = UpdateReleaseNotes.parse(text, localeIdentifier: localeIdentifier)
                 guard !notes.isEmpty else { return }
                 self.state = .available(self.information(for: pending, notes: notes))
             } catch {

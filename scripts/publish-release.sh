@@ -22,6 +22,8 @@ DMG="$OUTPUT_DIR/Remote-Mic-$VERSION-AppleSilicon.dmg"
 DMG_CHECKSUM="$DMG.sha256"
 UPDATE_ZIP="$OUTPUT_DIR/Remote-Mic-$VERSION-AppleSilicon.zip"
 APPCAST="$OUTPUT_DIR/appcast.xml"
+ZH_RELEASE_NOTES="$OUTPUT_DIR/Remote-Mic-$VERSION-AppleSilicon.zh.txt"
+EN_RELEASE_NOTES="$OUTPUT_DIR/Remote-Mic-$VERSION-AppleSilicon.en.txt"
 INTEL_OUTPUT_DIR="$OUTPUT_DIR/intel"
 INTEL_INSTALL_PACKAGE="$INTEL_OUTPUT_DIR/Install Remote Mic Intel.pkg"
 INTEL_UNINSTALL_PACKAGE="$INTEL_OUTPUT_DIR/Uninstall Remote Mic Intel.pkg"
@@ -29,6 +31,8 @@ INTEL_DMG="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.dmg"
 INTEL_DMG_CHECKSUM="$INTEL_DMG.sha256"
 INTEL_UPDATE_ZIP="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.zip"
 INTEL_APPCAST="$INTEL_OUTPUT_DIR/appcast-intel.xml"
+INTEL_ZH_RELEASE_NOTES="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.zh.txt"
+INTEL_EN_RELEASE_NOTES="$INTEL_OUTPUT_DIR/Remote-Mic-$VERSION-Intel.en.txt"
 
 if [[ "$#" -ne 1 || ( "$MODE" != "prerelease" && "$MODE" != "auto" && "$MODE" != "promote" ) ]]; then
   print -u2 "usage: $0 prerelease|auto|promote"
@@ -112,12 +116,16 @@ verify_local_artifacts() {
   test -f "$DMG_CHECKSUM"
   test -f "$UPDATE_ZIP"
   test -f "$APPCAST"
+  test -f "$ZH_RELEASE_NOTES"
+  test -f "$EN_RELEASE_NOTES"
   test -f "$INTEL_INSTALL_PACKAGE"
   test -f "$INTEL_UNINSTALL_PACKAGE"
   test -f "$INTEL_DMG"
   test -f "$INTEL_DMG_CHECKSUM"
   test -f "$INTEL_UPDATE_ZIP"
   test -f "$INTEL_APPCAST"
+  test -f "$INTEL_ZH_RELEASE_NOTES"
+  test -f "$INTEL_EN_RELEASE_NOTES"
 
   export EXPECTED_DEVELOPER_TEAM_ID REQUIRE_DEVELOPER_ID_SIGNING=1 REQUIRE_NOTARIZATION=1
   "$ROOT/scripts/verify-app.sh" "$APP"
@@ -130,13 +138,13 @@ verify_local_artifacts() {
   RELEASE_VARIANT=intel "$ROOT/scripts/verify-dmg.sh" "$INTEL_DMG"
 
   rg -Fq "url=\"$CDN_DOWNLOAD_PREFIX${UPDATE_ZIP:t}\"" "$APPCAST"
-  ! rg -q '<sparkle:releaseNotesLink>' "$APPCAST"
-  rg -q '<description' "$APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX${ZH_RELEASE_NOTES:t}" "$APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX${EN_RELEASE_NOTES:t}" "$APPCAST"
   rg -Fq "<sparkle:version>$BUILD</sparkle:version>" "$APPCAST"
   rg -Fq "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" "$APPCAST"
   rg -Fq "url=\"$CDN_DOWNLOAD_PREFIX${INTEL_UPDATE_ZIP:t}\"" "$INTEL_APPCAST"
-  ! rg -q '<sparkle:releaseNotesLink>' "$INTEL_APPCAST"
-  rg -q '<description' "$INTEL_APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX${INTEL_ZH_RELEASE_NOTES:t}" "$INTEL_APPCAST"
+  rg -Fq "$CDN_DOWNLOAD_PREFIX${INTEL_EN_RELEASE_NOTES:t}" "$INTEL_APPCAST"
   rg -Fq "<sparkle:version>$BUILD</sparkle:version>" "$INTEL_APPCAST"
   rg -Fq "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" "$INTEL_APPCAST"
 }
@@ -149,6 +157,10 @@ stage_assets() {
   /usr/bin/ditto --norsrc --noqtn --noacl "$DMG" "$STAGING_DIR/${DMG:t}"
   /usr/bin/ditto --norsrc --noqtn --noacl "$DMG_CHECKSUM" "$STAGING_DIR/${DMG_CHECKSUM:t}"
   /usr/bin/ditto --norsrc --noqtn --noacl "$UPDATE_ZIP" "$STAGING_DIR/${UPDATE_ZIP:t}"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$ZH_RELEASE_NOTES" "$STAGING_DIR/${ZH_RELEASE_NOTES:t}"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$EN_RELEASE_NOTES" "$STAGING_DIR/${EN_RELEASE_NOTES:t}"
   /usr/bin/ditto --norsrc --noqtn --noacl "$APPCAST" "$STAGING_DIR/appcast.xml"
   /usr/bin/ditto --norsrc --noqtn --noacl "$INTEL_INSTALL_PACKAGE" \
     "$STAGING_DIR/Remote-Mic-$VERSION-Intel-Installer.pkg"
@@ -159,6 +171,10 @@ stage_assets() {
     "$INTEL_DMG_CHECKSUM" "$STAGING_DIR/${INTEL_DMG_CHECKSUM:t}"
   /usr/bin/ditto --norsrc --noqtn --noacl \
     "$INTEL_UPDATE_ZIP" "$STAGING_DIR/${INTEL_UPDATE_ZIP:t}"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$INTEL_ZH_RELEASE_NOTES" "$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"
+  /usr/bin/ditto --norsrc --noqtn --noacl \
+    "$INTEL_EN_RELEASE_NOTES" "$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"
   /usr/bin/ditto --norsrc --noqtn --noacl "$INTEL_APPCAST" "$STAGING_DIR/appcast-intel.xml"
 
   /usr/bin/cmp -s "$INSTALL_PACKAGE" "$APPLE_SILICON_INSTALL_ASSET"
@@ -166,12 +182,16 @@ stage_assets() {
   /usr/bin/cmp -s "$DMG" "$STAGING_DIR/${DMG:t}"
   /usr/bin/cmp -s "$DMG_CHECKSUM" "$STAGING_DIR/${DMG_CHECKSUM:t}"
   /usr/bin/cmp -s "$UPDATE_ZIP" "$STAGING_DIR/${UPDATE_ZIP:t}"
+  /usr/bin/cmp -s "$ZH_RELEASE_NOTES" "$STAGING_DIR/${ZH_RELEASE_NOTES:t}"
+  /usr/bin/cmp -s "$EN_RELEASE_NOTES" "$STAGING_DIR/${EN_RELEASE_NOTES:t}"
   /usr/bin/cmp -s "$APPCAST" "$STAGING_DIR/appcast.xml"
   /usr/bin/cmp -s "$INTEL_INSTALL_PACKAGE" "$STAGING_DIR/Remote-Mic-$VERSION-Intel-Installer.pkg"
   /usr/bin/cmp -s "$INTEL_UNINSTALL_PACKAGE" "$STAGING_DIR/Remote-Mic-$VERSION-Intel-Uninstaller.pkg"
   /usr/bin/cmp -s "$INTEL_DMG" "$STAGING_DIR/${INTEL_DMG:t}"
   /usr/bin/cmp -s "$INTEL_DMG_CHECKSUM" "$STAGING_DIR/${INTEL_DMG_CHECKSUM:t}"
   /usr/bin/cmp -s "$INTEL_UPDATE_ZIP" "$STAGING_DIR/${INTEL_UPDATE_ZIP:t}"
+  /usr/bin/cmp -s "$INTEL_ZH_RELEASE_NOTES" "$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"
+  /usr/bin/cmp -s "$INTEL_EN_RELEASE_NOTES" "$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"
   /usr/bin/cmp -s "$INTEL_APPCAST" "$STAGING_DIR/appcast-intel.xml"
 }
 
@@ -236,7 +256,7 @@ generate_candidate_provenance() {
       payloadAssets: .
     }' "$payload_json_file" > "$CANDIDATE_PROVENANCE"
 
-  test "$(jq '.payloadAssets | length' "$CANDIDATE_PROVENANCE")" = "12"
+  test "$(jq '.payloadAssets | length' "$CANDIDATE_PROVENANCE")" = "16"
 }
 
 verify_candidate_source() {
@@ -458,7 +478,7 @@ download_and_compare_local_candidate() {
     test -f "$downloaded"
     /usr/bin/cmp -s "$expected" "$downloaded"
   done
-  test "$(/usr/bin/find "$DOWNLOAD_DIR" -type f | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = "13"
+  test "$(/usr/bin/find "$DOWNLOAD_DIR" -type f | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = "17"
   curl -fsSL "${GITHUB_DOWNLOAD_PREFIX}appcast.xml" -o "$WORK_DIR/tag-appcast.xml"
   /usr/bin/cmp -s "$STAGING_DIR/appcast.xml" "$WORK_DIR/tag-appcast.xml"
   curl -fsSL "${GITHUB_DOWNLOAD_PREFIX}appcast-intel.xml" -o "$WORK_DIR/tag-appcast-intel.xml"
@@ -534,12 +554,16 @@ if [[ "$MODE" == "prerelease" || "$MODE" == "auto" ]]; then
     "$APPLE_SILICON_UNINSTALL_ASSET" \
     "$STAGING_DIR/${DMG:t}" \
     "$STAGING_DIR/${DMG_CHECKSUM:t}" \
+    "$STAGING_DIR/${ZH_RELEASE_NOTES:t}" \
+    "$STAGING_DIR/${EN_RELEASE_NOTES:t}" \
     "$STAGING_DIR/appcast.xml" \
     "$STAGING_DIR/${INTEL_UPDATE_ZIP:t}" \
     "$STAGING_DIR/Remote-Mic-$VERSION-Intel-Installer.pkg" \
     "$STAGING_DIR/Remote-Mic-$VERSION-Intel-Uninstaller.pkg" \
     "$STAGING_DIR/${INTEL_DMG:t}" \
     "$STAGING_DIR/${INTEL_DMG_CHECKSUM:t}" \
+    "$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}" \
+    "$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}" \
     "$STAGING_DIR/appcast-intel.xml" \
     "$CANDIDATE_PROVENANCE" \
     "${release_options[@]}"
