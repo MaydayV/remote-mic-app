@@ -73,8 +73,6 @@ final class HIDRemoteMonitor {
     private let runtimePermissions: () -> Bool
     private let actionPerformer: (RemoteButton, ButtonTrigger, ConfiguredButtonAction) -> Bool
     private let appSwitcherSession: KeyboardInjector.AppSwitcherSession
-    private let overrideActionPerformer: (UUID?, RemoteButton, ButtonTrigger) -> Bool
-    private let hasOverrideBinding: (UUID?, RemoteButton, ButtonTrigger) -> Bool
     private let frontmostBundleIdentifier: () -> String?
     private let diagnosticLogger: (String) -> Void
     private let karabinerElementsInstalled: () -> Bool
@@ -122,12 +120,6 @@ final class HIDRemoteMonitor {
             ButtonTrigger,
             ConfiguredButtonAction
         ) -> Bool)? = nil,
-        overrideActionPerformer: @escaping (UUID?, RemoteButton, ButtonTrigger) -> Bool = {
-            _, _, _ in false
-        },
-        hasOverrideBinding: @escaping (UUID?, RemoteButton, ButtonTrigger) -> Bool = {
-            _, _, _ in false
-        },
         frontmostBundleIdentifier: @escaping () -> String? = {
             NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         },
@@ -157,8 +149,6 @@ final class HIDRemoteMonitor {
                 )
             )
         }
-        self.overrideActionPerformer = overrideActionPerformer
-        self.hasOverrideBinding = hasOverrideBinding
         self.frontmostBundleIdentifier = frontmostBundleIdentifier
         self.diagnosticLogger = diagnosticLogger
         self.karabinerElementsInstalled = karabinerElementsInstalled
