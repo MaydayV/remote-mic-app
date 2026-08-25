@@ -638,7 +638,14 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         AppLogger.shared.write("AUDIO TEST_TONE cancelled reason=\(logReason)")
     }
 
-    func applyHIDSettings() {
+    static func canFallbackVoiceKeyMode(
+        isStreaming: Bool,
+        allowVoiceKeyModeFallback: Bool
+    ) -> Bool {
+        !isStreaming && allowVoiceKeyModeFallback
+    }
+
+    func applyHIDSettings(allowVoiceKeyModeFallback: Bool = true) {
         if !settings.customMappingEnabled {
             stopLongRecording(reason: "mapping_disabled")
         }
@@ -649,27 +656,48 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         let requestedFnTapMode = settings.voiceFnTapModeEnabled
         if !requestedFnTapMode, voiceFnTapSession.requiresCleanupBeforeMapping {
             voiceFnTapSession.setEnabled(false) { [weak self] in
-                self?.applyHIDSettings()
+                self?.applyHIDSettings(
+                    allowVoiceKeyModeFallback: allowVoiceKeyModeFallback
+                )
             }
             return
         }
         requestNextHIDPermissionIfNeeded(voiceFnTapModeRequested: requestedFnTapMode)
         var powerKeySuppressed: Bool
+        let canFallbackVoiceKeyMode = Self.canFallbackVoiceKeyMode(
+            isStreaming: isStreaming,
+            allowVoiceKeyModeFallback: allowVoiceKeyModeFallback
+        )
         if requestedFnTapMode, KeyboardInjector.isAccessibilityTrusted {
             powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: true)
             if voiceFunctionMapper.isVoiceKeyNeutralized {
                 voiceFnTapSession.setEnabled(true)
-            } else {
+            } else if canFallbackVoiceKeyMode {
                 settings.voiceFnTapModeEnabled = false
                 voiceFnTapSession.setEnabled(false)
                 powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: false)
+            } else {
+                AppLogger.shared.write(
+                    "VOICE FN TAP mode_preserved reason=voice_start_mapping_failed"
+                )
+                powerKeySuppressed = !settings.customMappingEnabled ||
+                    voiceFunctionMapper.isPowerKeySuppressed
             }
         } else {
             if requestedFnTapMode {
                 settings.voiceFnTapModeEnabled = false
             }
             voiceFnTapSession.setEnabled(false)
-            powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: false)
+            if canFallbackVoiceKeyMode {
+                powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: false)
+            } else {
+                voiceShortcutStatus = LocalizedMessage("voice_button.status.waiting")
+                AppLogger.shared.write(
+                    "VOICE KEY mode_preserved reason=voice_start_mapping_failed"
+                )
+                powerKeySuppressed = !settings.customMappingEnabled ||
+                    voiceFunctionMapper.isPowerKeySuppressed
+            }
         }
         startHIDMonitors(powerKeySuppressed: powerKeySuppressed)
     }
@@ -1203,6 +1231,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             _ = bridge.requestMicrophoneClose()
             AppLogger.shared.write("ATVV STREAM rejected_busy")
             return
+        }
+        if settings.voiceFnTapModeEnabled {
+            applyHIDSettings(allowVoiceKeyModeFallback: false)
         }
         guard ensureVirtualAudioOutputReady(reason: "bluetooth_voice_start") else {
             _ = bridge.requestMicrophoneClose()
