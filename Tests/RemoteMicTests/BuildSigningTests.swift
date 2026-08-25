@@ -64,6 +64,25 @@ struct BuildSigningTests {
         #expect(!verifySource.contains("SayAllAI"))
     }
 
+    @Test func installerSigningUsesTheReleaseKeychainAndHasATimeout() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("scripts/build-doubao-driver-pkg.sh"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("INSTALLER_SIGNING_KEYCHAIN=\"${INSTALLER_SIGNING_KEYCHAIN:-${NOTARY_KEYCHAIN:-}}\""))
+        #expect(source.contains("PRODUCTSIGN_TIMEOUT_SECONDS=\"${PRODUCTSIGN_TIMEOUT_SECONDS:-900}\""))
+        #expect(source.contains("productsign --sign \"$INSTALLER_SIGNING_IDENTITY\""))
+        #expect(source.contains("\"${PRODUCTSIGN_KEYCHAIN_ARGS[@]}\""))
+        #expect(source.contains("productsign timed out after"))
+        #expect(source.contains("sign_product \"$UNSIGNED_INSTALL_PACKAGE\" \"$INSTALL_PACKAGE\""))
+        #expect(source.contains("sign_product \"$UNSIGNED_UNINSTALL_PACKAGE\" \"$UNINSTALL_PACKAGE\""))
+    }
+
     @Test func clientUsesOnlyTheStableUpdateFeed() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

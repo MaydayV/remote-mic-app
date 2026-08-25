@@ -12,6 +12,8 @@ LEGACY_INSTALL_PACKAGE="$OUTPUT_DIR/安装豆包兼容麦克风.pkg"
 UNINSTALL_PACKAGE="$OUTPUT_DIR/$RELEASE_UNINSTALL_PACKAGE_NAME"
 LEGACY_UNINSTALL_PACKAGE="$OUTPUT_DIR/卸载豆包兼容麦克风.pkg"
 INSTALLER_SIGNING_IDENTITY="${INSTALLER_SIGNING_IDENTITY:--}"
+INSTALLER_SIGNING_KEYCHAIN="${INSTALLER_SIGNING_KEYCHAIN:-${NOTARY_KEYCHAIN:-}}"
+PRODUCTSIGN_TIMEOUT_SECONDS="${PRODUCTSIGN_TIMEOUT_SECONDS:-900}"
 REQUIRE_DEVELOPER_ID_SIGNING="${REQUIRE_DEVELOPER_ID_SIGNING:-0}"
 WORK_DIR="$(/usr/bin/mktemp -d "$OUTPUT_DIR/.doubao-driver-package.XXXXXX")"
 PAYLOAD_ROOT="$WORK_DIR/payload"
@@ -36,6 +38,15 @@ esac
 if [[ "$REQUIRE_DEVELOPER_ID_SIGNING" == "1" && "$INSTALLER_SIGNING_IDENTITY" == "-" ]]; then
   print -u2 "Developer ID Installer signing is required"
   exit 1
+fi
+if ! [[ "$PRODUCTSIGN_TIMEOUT_SECONDS" =~ '^[1-9][0-9]*$' ]]; then
+  print -u2 "PRODUCTSIGN_TIMEOUT_SECONDS must be a positive integer"
+  exit 1
+fi
+PRODUCTSIGN_KEYCHAIN_ARGS=()
+if [[ -n "$INSTALLER_SIGNING_KEYCHAIN" ]]; then
+  test -f "$INSTALLER_SIGNING_KEYCHAIN"
+  PRODUCTSIGN_KEYCHAIN_ARGS=(--keychain "$INSTALLER_SIGNING_KEYCHAIN")
 fi
 "$ROOT/scripts/verify-doubao-driver.sh" "$DRIVER"
 "$ROOT/scripts/verify-app.sh" "$APP"
@@ -76,12 +87,41 @@ fi
   --version "$VERSION" \
   "$UNSIGNED_UNINSTALL_PACKAGE"
 
+sign_product() {
+  local input_package="$1"
+  local output_package="$2"
+  local productsign_pid
+  local timeout_pid
+  local exit_code
+
+  /usr/bin/productsign --sign "$INSTALLER_SIGNING_IDENTITY" \
+    "${PRODUCTSIGN_KEYCHAIN_ARGS[@]}" \
+    "$input_package" "$output_package" &
+  productsign_pid=$!
+  (
+    /bin/sleep "$PRODUCTSIGN_TIMEOUT_SECONDS"
+    if /bin/kill -0 "$productsign_pid" >/dev/null 2>&1; then
+      print -u2 "productsign timed out after ${PRODUCTSIGN_TIMEOUT_SECONDS}s: $input_package"
+      /bin/kill "$productsign_pid" >/dev/null 2>&1 || true
+    fi
+  ) &
+  timeout_pid=$!
+
+  if wait "$productsign_pid"; then
+    /bin/kill "$timeout_pid" >/dev/null 2>&1 || true
+    wait "$timeout_pid" >/dev/null 2>&1 || true
+  else
+    exit_code=$?
+    /bin/kill "$timeout_pid" >/dev/null 2>&1 || true
+    wait "$timeout_pid" >/dev/null 2>&1 || true
+    return "$exit_code"
+  fi
+}
+
 if [[ "$INSTALLER_SIGNING_IDENTITY" != "-" ]]; then
   test -x /usr/bin/productsign
-  /usr/bin/productsign --sign "$INSTALLER_SIGNING_IDENTITY" \
-    "$UNSIGNED_INSTALL_PACKAGE" "$INSTALL_PACKAGE"
-  /usr/bin/productsign --sign "$INSTALLER_SIGNING_IDENTITY" \
-    "$UNSIGNED_UNINSTALL_PACKAGE" "$UNINSTALL_PACKAGE"
+  sign_product "$UNSIGNED_INSTALL_PACKAGE" "$INSTALL_PACKAGE"
+  sign_product "$UNSIGNED_UNINSTALL_PACKAGE" "$UNINSTALL_PACKAGE"
 else
   /bin/mv "$UNSIGNED_INSTALL_PACKAGE" "$INSTALL_PACKAGE"
   /bin/mv "$UNSIGNED_UNINSTALL_PACKAGE" "$UNINSTALL_PACKAGE"
