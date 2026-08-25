@@ -1,6 +1,8 @@
 # Bug 记录
 
 - [历史蓝牙缓存持续固定频率重连](./2026-08-24-ble-cached-reconnect-storm.md)
+- [不同版本的无线麦同时运行](./2026-08-24-duplicate-app-instances.md)
+- [首次启动窗口尺寸与居中异常](./2026-08-24-onboarding-first-launch-window-offscreen.md)
 
 
 - [HID 遥控器被其他输入工具占用时 Onboarding 无法继续](./2026-08-20-hid-exclusive-access-input-tools.md)- [Onboarding 已发现遥控器但永远等不到首个 HID 按键](./2026-08-20-onboarding-hid-discovery-report-deadlock.md)
