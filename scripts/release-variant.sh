@@ -14,7 +14,7 @@ case "$RELEASE_VARIANT" in
     RELEASE_MIN_SYSTEM_VERSION="14.0"
     RELEASE_MIN_SYSTEM_MAJOR="14"
     RELEASE_OUTPUT_DIR="$ROOT/dist"
-    RELEASE_ASSET_SUFFIX=""
+    RELEASE_ASSET_SUFFIX="-AppleSilicon"
     RELEASE_APPCAST_NAME="appcast.xml"
     RELEASE_FEED_URL="https://github.com/MaydayV/remote-mic-app/releases/latest/download/appcast.xml"
     RELEASE_INSTALL_PACKAGE_NAME="Install Remote Mic.pkg"

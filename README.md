@@ -39,7 +39,7 @@
 
 ## 下载与安装
 
-Apple Silicon 最新正式版可从 [GitHub Releases](https://github.com/MaydayV/remote-mic-app/releases/latest) 下载，文件名为 `Remote-Mic-<版本>.dmg`。Intel Mac 请下载文件名带 `Intel` 的 `Remote-Mic-<版本>-Intel.dmg`，不要使用 Apple Silicon 安装包。
+Apple Silicon 最新正式版可从 [GitHub Releases](https://github.com/MaydayV/remote-mic-app/releases/latest) 下载，文件名为 `Remote-Mic-<版本>-AppleSilicon.dmg`。Intel Mac 请下载文件名带 `Intel` 的 `Remote-Mic-<版本>-Intel.dmg`，不要使用 Apple Silicon 安装包。
 
 Windows 与 Mac 单独构建和发布。当前仅提供面向小米 RC003 的 [Windows RC003 Community Preview v0.1.0](https://github.com/MaydayV/remote-mic-app/releases/tag/windows-v0.1.0-community-preview)，它是未签名、尚未由主项目维护者独立真机复验的社区预览版，不进入 Mac 的 Sparkle 更新序列。下载前请阅读 Release 中的权限、杀毒软件和虚拟音频设备提示，并使用 `SHA256SUMS.txt` 校验文件。
 

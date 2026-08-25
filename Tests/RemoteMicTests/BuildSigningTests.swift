@@ -271,6 +271,7 @@ struct BuildSigningTests {
         #expect(variantSource.contains("x86_64-apple-macosx13.0"))
         #expect(variantSource.contains("RELEASE_OUTPUT_DIR=\"$ROOT/dist/intel\""))
         #expect(variantSource.contains("RELEASE_APPCAST_NAME=\"appcast-intel.xml\""))
+        #expect(variantSource.contains("RELEASE_ASSET_SUFFIX=\"-AppleSilicon\""))
         #expect(variantSource.contains("RELEASE_ASSET_SUFFIX=\"-Intel\""))
 
         #expect(workflowSource.contains("RELEASE_VARIANT: ${{ matrix.variant }}"))
@@ -402,21 +403,25 @@ struct BuildSigningTests {
         )
 
         for requiredText in [
-            "Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.zh.txt",
-            "Remote-Mic-$VERSION$RELEASE_ASSET_SUFFIX.en.txt",
-            "--release-notes-url-prefix \"$CDN_DOWNLOAD_PREFIX\"",
+            "SPARKLE_NOTES=\"$SPARKLE_ARCHIVES/${ZIP_BASENAME:r}.txt\"",
+            "--embed-release-notes",
+            "--full-release-notes-url \"$RELEASE_PAGE\"",
         ] {
             #expect(notarizeSource.contains(requiredText))
         }
         #expect(notarizeSource.contains("GENERATE_SPARKLE_UPDATE=\"${GENERATE_SPARKLE_UPDATE:-1}\""))
         #expect(notarizeSource.contains("SPARKLE UPDATE: skipped for private test package"))
-        #expect(publishSource.contains("$STAGING_DIR/${ZH_RELEASE_NOTES:t}"))
-        #expect(publishSource.contains("$STAGING_DIR/${EN_RELEASE_NOTES:t}"))
-        #expect(publishSource.contains("$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"))
-        #expect(publishSource.contains("$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"))
-        #expect(publishSource.contains(".payloadAssets | length' \"$CANDIDATE_PROVENANCE\")\" = \"16\""))
-        #expect(publishSource.contains("= \"17\""))
-        #expect(publishSource.contains("== 14 or (.payloadAssets | length) == 16"))
+        #expect(publishSource.contains("Remote-Mic-$VERSION-AppleSilicon-Installer.pkg"))
+        #expect(publishSource.contains("Remote-Mic-$VERSION-AppleSilicon-Uninstaller.pkg"))
+        #expect(publishSource.contains("Remote-Mic-$VERSION-Intel-Installer.pkg"))
+        #expect(publishSource.contains("Remote-Mic-$VERSION-Intel-Uninstaller.pkg"))
+        #expect(!publishSource.contains("$STAGING_DIR/${ZH_RELEASE_NOTES:t}"))
+        #expect(!publishSource.contains("$STAGING_DIR/${EN_RELEASE_NOTES:t}"))
+        #expect(!publishSource.contains("$STAGING_DIR/${INTEL_ZH_RELEASE_NOTES:t}"))
+        #expect(!publishSource.contains("$STAGING_DIR/${INTEL_EN_RELEASE_NOTES:t}"))
+        #expect(publishSource.contains(".payloadAssets | length' \"$CANDIDATE_PROVENANCE\")\" = \"12\""))
+        #expect(publishSource.contains("= \"13\""))
+        #expect(publishSource.contains("== 12 or (.payloadAssets | length) == 14 or (.payloadAssets | length) == 16"))
         #expect(publishSource.contains("candidate-provenance.json"))
         #expect(notarizeSource.contains("GITHUB_DOWNLOAD_PREFIX=\"https://github.com/MaydayV/remote-mic-app/releases/download/$RELEASE_TAG/\""))
         #expect(publishSource.contains("appcast-intel.xml"))

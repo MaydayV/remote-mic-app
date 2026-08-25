@@ -207,6 +207,9 @@ final class UpdateInformationStore: ObservableObject {
         localeIdentifier: String
     ) {
         notesTask?.cancel()
+        // 新版 appcast 已将更新内容直接嵌入 itemDescription；只有历史
+        // appcast 没有内嵌说明时，才回退到旧版的 .txt 资产读取方式。
+        guard pending.fallbackNotes.isEmpty else { return }
         guard let archiveURL = pending.archiveURL,
               let notesURL = UpdateReleaseNotes.assetURL(
                 for: archiveURL,

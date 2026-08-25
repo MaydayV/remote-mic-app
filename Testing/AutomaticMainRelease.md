@@ -18,7 +18,7 @@
 2. 在 GitHub Actions 中打开 `macOS Signed Release Packages`，确认事件为 `push`，且 Checkout SHA 等于提交 SHA。
 3. 确认 `prepare-main-auto-release.sh` 根据当前正式 Release 生成下一个补丁版本、递增 Build，并生成中英文 Release Notes。
 4. 等待 Apple Silicon 与 Intel 测试、公证、Sparkle appcast 生成和资产校验全部完成。
-5. 打开 GitHub Releases，确认新增的 `vX.Y.Z` 为 Stable/Latest，并包含 DMG、PKG、ZIP、两个 appcast、双语说明和校验文件；默认 appcast 的更新包和说明链接应指向本仓库的 GitHub Release。
+5. 打开 GitHub Releases，确认新增的 `vX.Y.Z` 为 Stable/Latest，并包含按 AppleSilicon/Intel 和 Installer/Uninstaller 区分命名的 DMG、PKG、ZIP、两个 appcast 和校验文件；更新说明显示在 Release 正文中，不再单独展示 `.txt` 资产。
 6. 在已安装的旧版 Remote Mic 中点击“检查更新”，确认客户端发现新版本，并完成 Sparkle 下载、安装和重启。
 
 ## 预期结果

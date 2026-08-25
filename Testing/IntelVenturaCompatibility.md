@@ -5,7 +5,7 @@
 Intel 发行线是独立的正式兼容版本，不使用 Universal 包，也不改变 Apple Silicon 发行线：
 
 - Intel：`x86_64`、macOS 13.0、`appcast-intel.xml`、文件名带 `Intel`。
-- Apple Silicon：`arm64`、macOS 14.0、`appcast.xml`、现有文件名保持不变。
+- Apple Silicon：`arm64`、macOS 14.0、`appcast.xml`、文件名带 `AppleSilicon`。
 
 自动化可以验证编译、架构、最低系统版本、安装包内容、Sparkle 结构和 Feed 隔离，但不能替代真实 Intel Mac 上的蓝牙、HID、音频驱动和睡眠唤醒验收。
 
