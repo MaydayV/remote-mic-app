@@ -21,6 +21,8 @@ enum KeyboardInjector {
     typealias KeyPoster = (CGKeyCode, CGEventFlags) -> Void
     typealias KeyStatePoster = (CGKeyCode, Bool, CGEventFlags) -> Bool
 
+    static let leftCommandKeyCode: CGKeyCode = 55
+
     final class AppSwitcherSession {
         private let keyStatePoster: KeyStatePoster
         private(set) var isActive = false
