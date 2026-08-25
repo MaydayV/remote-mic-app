@@ -24,6 +24,7 @@
 ## 修复
 
 - `RemoteButtons.swift`：`.tv` 的 `nativeEvent` 改为 `keyboard(keyCode: 10)`，并加注释标明实测依据。
+- 为兼容 ANSI 键盘布局，再同时抑制历史兼容键码 `50`；ISO 与 ANSI 两种布局的 TV 原生事件都不会泄漏。
 - 测试：`RemoteButtonsTests.nativeEventDescriptorsCoverPotentialDuplicateEvents` 与 SelfTest 的 "native duplicate-event descriptors" 断言组各补 TV==10 一项。
 
 ## 验证

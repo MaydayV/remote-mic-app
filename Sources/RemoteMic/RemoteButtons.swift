@@ -112,6 +112,12 @@ enum RemoteButton: String, CaseIterable, Codable, Identifiable {
         case .voice: return nil                       // 语音键触发麦克风链路，不产生系统事件
         }
     }
+
+    /// TV reports different native keyboard codes on ISO and ANSI layouts.
+    var nativeEvents: Set<RemoteNativeEvent> {
+        guard let nativeEvent else { return [] }
+        return self == .tv ? [nativeEvent, .keyboard(keyCode: 50)] : [nativeEvent]
+    }
 }
 
 enum RemoteNativeEvent: Hashable {
