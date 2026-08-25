@@ -76,6 +76,22 @@ struct SettingsPageRegressionTests {
         ) == .regular)
     }
 
+    @Test func siriRemoteBackendChoiceUsesTheRealRemotePhoto() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let settingsSource = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/SettingsView.swift"),
+            encoding: .utf8
+        )
+
+        #expect(settingsSource.contains("kind == .siriRemote, let photo = SiriRemoteImageResource.image"))
+        #expect(settingsSource.contains("forResource: \"SiriRemote-photo\""))
+        #expect(settingsSource.contains("Image(nsImage: photo)"))
+        #expect(settingsSource.contains("Image(systemName: icon)"))
+    }
+
     @Test func mappingSelectionStaysOnTheEditedButtonWhileLocked() {
         #expect(MappingSelectionPolicy.selection(
             current: .home,

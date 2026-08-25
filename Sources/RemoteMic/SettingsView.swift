@@ -378,10 +378,17 @@ struct SettingsView: View {
             model.setActiveBackend(kind)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .frame(width: 34)
+                if kind == .siriRemote, let photo = SiriRemoteImageResource.image {
+                    Image(nsImage: photo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 34, height: 68)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .frame(width: 34)
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(localization.text(titleKey))
@@ -3351,6 +3358,18 @@ private enum RC003ImageResource {
             forResource: "RC003-remote-photo",
             withExtension: "png"
         ) else { return nil }
+        return NSImage(contentsOf: url)
+    }()
+}
+
+private enum SiriRemoteImageResource {
+    static let image: NSImage? = {
+        guard let url = Bundle.main.url(
+            forResource: "SiriRemote-photo",
+            withExtension: "png"
+        ) else {
+            return nil
+        }
         return NSImage(contentsOf: url)
     }()
 }

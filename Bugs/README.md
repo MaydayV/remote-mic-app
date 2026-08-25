@@ -4,6 +4,7 @@
 - [不同版本的无线麦同时运行](./2026-08-24-duplicate-app-instances.md)
 - [首次启动窗口尺寸与居中异常](./2026-08-24-onboarding-first-launch-window-offscreen.md)
 - [关闭设置窗口后 Dock 图标未隐藏](./2026-08-25-settings-window-dock-icon.md)
+- [Apple Siri Remote 选择卡片显示图标而非真实图片](./2026-08-25-siri-remote-selection-icon.md)
 
 
 - [HID 遥控器被其他输入工具占用时 Onboarding 无法继续](./2026-08-20-hid-exclusive-access-input-tools.md)- [Onboarding 已发现遥控器但永远等不到首个 HID 按键](./2026-08-20-onboarding-hid-discovery-report-deadlock.md)
