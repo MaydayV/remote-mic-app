@@ -20,6 +20,18 @@ enum BluetoothVoiceStopPolicy {
     }
 }
 
+/// The onboarding view only needs to know that audio has arrived once per voice session.
+/// Keeping the monotonically increasing sample counter for diagnostics while publishing this
+/// edge-triggered receipt avoids invalidating the whole SwiftUI tree for every audio packet.
+enum VoiceSamplePresentationPolicy {
+    static func shouldPublishReceipt(
+        hasReceivedSamples: Bool,
+        sampleCount: Int
+    ) -> Bool {
+        sampleCount > 0 && !hasReceivedSamples
+    }
+}
+
 final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private static let longRecordingOpenTimeout: TimeInterval = 5
     private static let longRecordingCloseTimeout: TimeInterval = 2
@@ -44,6 +56,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var isPlayingTestTone = false
     @Published private(set) var isAudioOutputReady = false
     @Published private(set) var currentVoiceSampleCount: UInt64 = 0
+    @Published private(set) var hasReceivedCurrentVoiceSamples = false
     @Published private(set) var voiceShortcutStatus = LocalizedMessage("voice_button.status.preparing")
 
     private let audioOutput = VirtualAudioOutput()
@@ -978,6 +991,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         siriRemoteVoiceActive = true
         currentVoiceSampleCount = 0
+        hasReceivedCurrentVoiceSamples = false
         voiceFnTapSession.resume()
         _ = voiceFnTapSession.startVoice()
         beginVoiceSessionIfNeeded()
@@ -998,6 +1012,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             || audioOutput.enqueue(samples: samples, sampleRate: sampleRate)
         if enqueued {
             currentVoiceSampleCount &+= UInt64(samples.count)
+            publishCurrentVoiceSampleReceiptIfNeeded(sampleCount: samples.count)
         }
     }
 
@@ -1207,6 +1222,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         bluetoothVoiceDecodedBatchCount = 0
         bluetoothVoiceDecodedSampleCount = 0
         currentVoiceSampleCount = 0
+        hasReceivedCurrentVoiceSamples = false
         bluetoothVoiceEnqueueFailureCount = 0
         bluetoothVoiceTraceRoute = "none"
         AppLogger.shared.write(
@@ -1269,6 +1285,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         bluetoothVoiceDecodedBatchCount += 1
         bluetoothVoiceDecodedSampleCount += samples.count
         currentVoiceSampleCount &+= UInt64(samples.count)
+        publishCurrentVoiceSampleReceiptIfNeeded(sampleCount: samples.count)
         if !enqueued {
             bluetoothVoiceEnqueueFailureCount += 1
         }
@@ -1285,6 +1302,14 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                     "pending_buffers=\(audioOutput.pendingVoiceBufferCountForDiagnostics)"
             )
         }
+    }
+
+    private func publishCurrentVoiceSampleReceiptIfNeeded(sampleCount: Int) {
+        guard VoiceSamplePresentationPolicy.shouldPublishReceipt(
+            hasReceivedSamples: hasReceivedCurrentVoiceSamples,
+            sampleCount: sampleCount
+        ) else { return }
+        hasReceivedCurrentVoiceSamples = true
     }
 
     func bluetoothBridge(_ bridge: XiaomiBluetoothBridge, didUpdateBatteryLevel level: Int?) {

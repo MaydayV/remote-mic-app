@@ -104,8 +104,8 @@ struct OnboardingView: View {
                 voiceSessionEnded = true
             }
         }
-        .onReceive(model.$currentVoiceSampleCount) { sampleCount in
-            guard settings.onboardingStep == .voiceTest, sampleCount > 0 else { return }
+        .onReceive(model.$hasReceivedCurrentVoiceSamples.removeDuplicates()) { hasReceivedSamples in
+            guard settings.onboardingStep == .voiceTest, hasReceivedSamples else { return }
             voiceSamplesReceived = true
         }
         .onChange(of: settings.onboardingStep) { step in
