@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import SwiftUI
 import Testing
 @testable import RemoteMic
@@ -43,6 +44,36 @@ struct SettingsPageRegressionTests {
         #expect(!appSource.contains("window.isMovableByWindowBackground = true"))
         #expect(settingsSource.contains("WindowDragArea()"))
         #expect(settingsSource.contains("window?.performDrag(with: event)"))
+    }
+
+    @Test func closingSettingsCanHideDockIconWhileKeepingTheMenuBarAppAlive() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appSource = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/RemoteMicApp.swift"),
+            encoding: .utf8
+        )
+
+        #expect(appSource.contains("window.hidesOnDeactivate = false"))
+        #expect(appSource.contains("window.delegate = self"))
+        #expect(appSource.contains("func windowWillClose(_ notification: Notification)"))
+        #expect(appSource.contains("isSettingsWindowOpen = false"))
+        #expect(appSource.contains("updateDockActivationPolicy()"))
+
+        #expect(SettingsWindowActivationPolicy.value(
+            showDockIcon: false,
+            isSettingsWindowOpen: true
+        ) == .regular)
+        #expect(SettingsWindowActivationPolicy.value(
+            showDockIcon: false,
+            isSettingsWindowOpen: false
+        ) == .accessory)
+        #expect(SettingsWindowActivationPolicy.value(
+            showDockIcon: true,
+            isSettingsWindowOpen: false
+        ) == .regular)
     }
 
     @Test func mappingSelectionStaysOnTheEditedButtonWhileLocked() {

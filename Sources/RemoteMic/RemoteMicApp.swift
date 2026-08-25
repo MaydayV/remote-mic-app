@@ -17,6 +17,15 @@ struct UpdateFeedSelection {
     }
 }
 
+enum SettingsWindowActivationPolicy {
+    static func value(
+        showDockIcon: Bool,
+        isSettingsWindowOpen: Bool
+    ) -> NSApplication.ActivationPolicy {
+        showDockIcon || isSettingsWindowOpen ? .regular : .accessory
+    }
+}
+
 @main
 enum RemoteMicApp {
     @MainActor
@@ -94,7 +103,7 @@ enum RemoteMicApp {
 
 @MainActor
 private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate,
-    SPUUpdaterDelegate
+    NSWindowDelegate, SPUUpdaterDelegate
 {
     private enum UpdateCheckPurpose {
         case information
@@ -107,6 +116,7 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var settingsWindowController: NSWindowController?
+    private var isSettingsWindowOpen = false
     private var subscriptions = Set<AnyCancellable>()
     private var terminationSignalSources: [DispatchSourceSignal] = []
     private var applicationShortcutMonitor: Any?
@@ -126,7 +136,10 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
     private let hidItem = NSMenuItem()
 
     var activationPolicy: NSApplication.ActivationPolicy {
-        model.settings.showDockIcon ? .regular : .accessory
+        SettingsWindowActivationPolicy.value(
+            showDockIcon: model.settings.showDockIcon,
+            isSettingsWindowOpen: false
+        )
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -511,6 +524,8 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         }
         guard let windowController = settingsWindowController,
               let window = windowController.window else { return }
+        isSettingsWindowOpen = true
+        updateDockActivationPolicy()
         windowController.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -545,6 +560,8 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.isMovableByWindowBackground = false
+        window.hidesOnDeactivate = false
+        window.delegate = self
         window.contentViewController = hostingController
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 1020, height: 772)
@@ -552,6 +569,14 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
         window.setFrameAutosaveName("RemoteMicSettings")
         window.center()
         return NSWindowController(window: window)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window === settingsWindowController?.window
+        else { return }
+        isSettingsWindowOpen = false
+        updateDockActivationPolicy()
     }
 
     @objc private func showLog() {
@@ -645,10 +670,14 @@ private final class RemoteMicAppDelegate: NSObject, NSApplicationDelegate, NSMen
 
     private func setDockIconVisible(_ isVisible: Bool) {
         model.settings.showDockIcon = isVisible
-        NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
-        if isVisible {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        updateDockActivationPolicy()
+    }
+
+    private func updateDockActivationPolicy() {
+        NSApp.setActivationPolicy(SettingsWindowActivationPolicy.value(
+            showDockIcon: model.settings.showDockIcon,
+            isSettingsWindowOpen: isSettingsWindowOpen
+        ))
     }
 
     @objc private func openGitHub() {
