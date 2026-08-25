@@ -26,3 +26,7 @@
 
 - 本地已通过 `zsh -n`、`git diff --check` 和 `swift test --filter BuildSigningTests`。
 - 尚未完成新的 GitHub macOS Runner 签名、公证、Release 上传和真实安装验收；需要以修复后的 Actions Run 结果为准。
+
+## 后续发布校验问题
+
+第一次修复后的 Run 已成功完成双架构签名、公证、装订和 Gatekeeper 验证，并创建了 `v1.8.11` Release。随后发布脚本对旧的 `download.sayall.app` 外部 CDN 执行校验，但该域名没有同步本仓库资产，返回 404，导致工作流在 Release 已上传资产后失败。现已将本仓库默认 appcast 和下载地址改为 GitHub Release；外部 CDN 仅在显式设置 `RELEASE_DOWNLOAD_PREFIX` 时校验。

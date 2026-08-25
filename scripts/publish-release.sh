@@ -64,7 +64,22 @@ if ! print -r -- "$RELEASE_TAG" | rg -q '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
   exit 1
 fi
 GITHUB_DOWNLOAD_PREFIX="https://github.com/$REPOSITORY/releases/download/$RELEASE_TAG/"
-CDN_DOWNLOAD_PREFIX="https://download.sayall.app/mac/releases/$RELEASE_TAG/"
+CONFIGURED_DOWNLOAD_PREFIX="${RELEASE_DOWNLOAD_PREFIX:-}"
+if [[ -n "$CONFIGURED_DOWNLOAD_PREFIX" ]]; then
+  CDN_DOWNLOAD_PREFIX="$CONFIGURED_DOWNLOAD_PREFIX"
+  USE_EXTERNAL_DOWNLOAD_PREFIX=1
+else
+  CDN_DOWNLOAD_PREFIX="$GITHUB_DOWNLOAD_PREFIX"
+  USE_EXTERNAL_DOWNLOAD_PREFIX=0
+fi
+case "$CDN_DOWNLOAD_PREFIX" in
+  */) ;;
+  *) CDN_DOWNLOAD_PREFIX="$CDN_DOWNLOAD_PREFIX/" ;;
+esac
+if ! print -r -- "$CDN_DOWNLOAD_PREFIX" | rg -q '^https://'; then
+  print -u2 "RELEASE_DOWNLOAD_PREFIX must be an https URL"
+  exit 1
+fi
 for command_name in cmp curl gh git jq plutil rg shasum stat; do
   command -v "$command_name" >/dev/null 2>&1 || {
     print -u2 "Missing required command: $command_name"
@@ -466,7 +481,9 @@ download_and_compare_local_candidate() {
   curl -fsSL "${GITHUB_DOWNLOAD_PREFIX}appcast-intel.xml" -o "$WORK_DIR/tag-appcast-intel.xml"
   /usr/bin/cmp -s "$STAGING_DIR/appcast-intel.xml" "$WORK_DIR/tag-appcast-intel.xml"
   verify_downloaded_candidate
-  verify_cdn_assets "$STAGING_DIR"
+  if (( USE_EXTERNAL_DOWNLOAD_PREFIX == 1 )); then
+    verify_cdn_assets "$STAGING_DIR"
+  fi
 }
 
 generate_stable_promotion() {
@@ -558,7 +575,9 @@ if [[ "$MODE" == "prerelease" || "$MODE" == "auto" ]]; then
   fi
   download_and_compare_local_candidate
   if [[ "$MODE" == "auto" ]]; then
-    verify_stable_download_redirect
+    if (( USE_EXTERNAL_DOWNLOAD_PREFIX == 1 )); then
+      verify_stable_download_redirect
+    fi
     print "AUTO STABLE RELEASE PUBLISH PASS: https://github.com/$REPOSITORY/releases/tag/$RELEASE_TAG"
     exit 0
   fi
@@ -576,7 +595,9 @@ RELEASE_STATE="$(gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" --jq '[.d
 test "$RELEASE_STATE" = $'false\ttrue'
 download_release_assets
 verify_downloaded_candidate
-verify_cdn_assets "$DOWNLOAD_DIR"
+if (( USE_EXTERNAL_DOWNLOAD_PREFIX == 1 )); then
+  verify_cdn_assets "$DOWNLOAD_DIR"
+fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
   print "PUBLISH DRY RUN PASS"
@@ -597,5 +618,7 @@ curl -fsSL "https://github.com/$REPOSITORY/releases/latest/download/appcast.xml"
 /usr/bin/cmp -s "$DOWNLOAD_DIR/appcast.xml" "$WORK_DIR/latest-appcast.xml"
 curl -fsSL "https://github.com/$REPOSITORY/releases/latest/download/appcast-intel.xml" -o "$WORK_DIR/latest-appcast-intel.xml"
 /usr/bin/cmp -s "$DOWNLOAD_DIR/appcast-intel.xml" "$WORK_DIR/latest-appcast-intel.xml"
-verify_stable_download_redirect
+if (( USE_EXTERNAL_DOWNLOAD_PREFIX == 1 )); then
+  verify_stable_download_redirect
+fi
 print "RELEASE PROMOTION PASS: https://github.com/$REPOSITORY/releases/tag/$RELEASE_TAG"

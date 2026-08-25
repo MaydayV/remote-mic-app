@@ -27,7 +27,12 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-RemoteMic-notary}"
 NOTARY_KEYCHAIN="${NOTARY_KEYCHAIN:-}"
 EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-34T8V3NA4P}"
 PARALLEL_PACKAGE_NOTARIZATION="${PARALLEL_PACKAGE_NOTARIZATION:-0}"
-CDN_DOWNLOAD_PREFIX="${RELEASE_DOWNLOAD_PREFIX:-https://download.sayall.app/mac/releases/$RELEASE_TAG/}"
+GITHUB_DOWNLOAD_PREFIX="https://github.com/MaydayV/remote-mic-app/releases/download/$RELEASE_TAG/"
+CDN_DOWNLOAD_PREFIX="${RELEASE_DOWNLOAD_PREFIX:-$GITHUB_DOWNLOAD_PREFIX}"
+case "$CDN_DOWNLOAD_PREFIX" in
+  */) ;;
+  *) CDN_DOWNLOAD_PREFIX="$CDN_DOWNLOAD_PREFIX/" ;;
+esac
 RELEASE_PAGE="${RELEASE_PAGE_URL:-https://github.com/MaydayV/remote-mic-app/releases/tag/$RELEASE_TAG}"
 GENERATE_APPCAST="$ROOT/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
 SIGN_UPDATE="$ROOT/.build/artifacts/sparkle/Sparkle/bin/sign_update"

@@ -18,7 +18,7 @@
 2. 在 GitHub Actions 中打开 `macOS Signed Release Packages`，确认事件为 `push`，且 Checkout SHA 等于提交 SHA。
 3. 确认 `prepare-main-auto-release.sh` 根据当前正式 Release 生成下一个补丁版本、递增 Build，并生成中英文 Release Notes。
 4. 等待 Apple Silicon 与 Intel 测试、公证、Sparkle appcast 生成和资产校验全部完成。
-5. 打开 GitHub Releases，确认新增的 `vX.Y.Z` 为 Stable/Latest，并包含 DMG、PKG、ZIP、两个 appcast、双语说明和校验文件。
+5. 打开 GitHub Releases，确认新增的 `vX.Y.Z` 为 Stable/Latest，并包含 DMG、PKG、ZIP、两个 appcast、双语说明和校验文件；默认 appcast 的更新包和说明链接应指向本仓库的 GitHub Release。
 6. 在已安装的旧版 Remote Mic 中点击“检查更新”，确认客户端发现新版本，并完成 Sparkle 下载、安装和重启。
 
 ## 预期结果
@@ -33,7 +33,7 @@
 - `main` 推送没有触发签名发布工作流。
 - 工作流只执行 `swift build`，没有生成并上传 DMG/PKG/ZIP。
 - 版本号、Build、Tag 或 appcast 不一致，或 Release 被标记为 Pre-release。
-- 签名、公证、Sparkle 签名、CDN 下载、安装包校验或旧版更新任一步失败。
+- 签名、公证、Sparkle 签名、GitHub Release 下载、安装包校验或旧版更新任一步失败；只有配置外部 `RELEASE_DOWNLOAD_PREFIX` 时才额外执行 CDN 下载校验。
 - 凭据缺失时仍创建了不完整 Release。
 
 ## 稳定回归
