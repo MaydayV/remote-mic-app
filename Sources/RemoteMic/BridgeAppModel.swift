@@ -952,6 +952,10 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func updateVoiceKeyState(streaming: Bool) {
         let mode = settings.voiceKeyMode
+        // Fn remains the existing hardware/software path. Only Command modes
+        // need an explicit synthetic key pair; injecting Fn here would
+        // duplicate the mapped remote event.
+        guard mode != .function else { return }
         if streaming {
             guard !voiceKeyIsHeld else { return }
             guard KeyboardInjector.setVoiceKeyPressed(mode: mode, isPressed: true) else {
