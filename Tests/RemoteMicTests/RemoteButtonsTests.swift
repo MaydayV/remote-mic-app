@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import CryptoKit
 import Foundation
 import Testing
@@ -215,6 +216,8 @@ struct RemoteButtonsTests {
         #expect(ButtonAction.commandClose.category == .basicKeys)
         #expect(ButtonAction.commandUndo.category == .basicKeys)
         #expect(ButtonAction.commandDelete.category == .basicKeys)
+        #expect(ButtonAction.scrollUp.category == .basicKeys)
+        #expect(ButtonAction.scrollDown.category == .basicKeys)
         #expect(ButtonAction.volumeUp.category == .systemAndMedia)
         #expect(ButtonAction.previousCommandLeft.category == .systemAndMedia)
         #expect(ButtonAction.nextCommandRight.category == .systemAndMedia)
@@ -242,8 +245,81 @@ struct RemoteButtonsTests {
         #expect(!ButtonAction.previousCommandLeft.allowsRepeat)
         #expect(!ButtonAction.nextCommandRight.allowsRepeat)
         #expect(ButtonAction.arrowUp.allowsRepeat)
+        #expect(ButtonAction.scrollUp.allowsRepeat)
+        #expect(ButtonAction.scrollDown.allowsRepeat)
         #expect(ButtonAction.volumeDown.allowsRepeat)
         #expect(ButtonAction.deleteBackward.allowsRepeat)
+    }
+
+    @Test func scrollActionsPostLineWheelTicksInsteadOfArrowKeys() {
+        var scrolled: [Int32] = []
+        var posted: [(CGKeyCode, CGEventFlags)] = []
+
+        #expect(KeyboardInjector.send(
+            .scrollUp,
+            accessibilityTrusted: { true },
+            keyPoster: { posted.append(($0, $1)) },
+            scrollPoster: { scrolled.append($0) }
+        ))
+        #expect(scrolled == [KeyboardInjector.scrollLineCount])
+        #expect(posted.isEmpty)
+
+        scrolled.removeAll()
+        #expect(KeyboardInjector.send(
+            .scrollDown,
+            accessibilityTrusted: { true },
+            keyPoster: { posted.append(($0, $1)) },
+            scrollPoster: { scrolled.append($0) }
+        ))
+        #expect(scrolled == [-KeyboardInjector.scrollLineCount])
+        #expect(posted.isEmpty)
+
+        scrolled.removeAll()
+        #expect(!KeyboardInjector.send(
+            .scrollUp,
+            accessibilityTrusted: { false },
+            scrollPoster: { scrolled.append($0) }
+        ))
+        #expect(scrolled.isEmpty)
+    }
+
+    @Test func scrollEventsTargetTheFrontmostWindowOrCursorFallback() {
+        let cursor = CGPoint(x: 12, y: 34)
+        #expect(KeyboardInjector.scrollTargetLocation(
+            windowFrame: CGRect(x: 100, y: 200, width: 800, height: 600),
+            mouseLocation: cursor
+        ) == CGPoint(x: 500, y: 500))
+        #expect(KeyboardInjector.scrollTargetLocation(
+            windowFrame: nil,
+            mouseLocation: cursor
+        ) == cursor)
+
+        func entry(processIdentifier: pid_t, layer: Int, bounds: CGRect) -> [String: Any] {
+            [
+                kCGWindowOwnerPID as String: NSNumber(value: processIdentifier),
+                kCGWindowLayer as String: NSNumber(value: layer),
+                kCGWindowBounds as String: [
+                    "X": bounds.origin.x,
+                    "Y": bounds.origin.y,
+                    "Width": bounds.width,
+                    "Height": bounds.height,
+                ] as NSDictionary,
+            ]
+        }
+        let windows: [[String: Any]] = [
+            entry(processIdentifier: 501, layer: 0, bounds: CGRect(x: 0, y: 0, width: 400, height: 300)),
+            entry(processIdentifier: 501, layer: 0, bounds: CGRect(x: 100, y: 50, width: 1_200, height: 800)),
+            entry(processIdentifier: 501, layer: 25, bounds: CGRect(x: 0, y: 0, width: 2_000, height: 2_000)),
+            entry(processIdentifier: 777, layer: 0, bounds: CGRect(x: 0, y: 0, width: 1_600, height: 1_200)),
+        ]
+        #expect(KeyboardInjector.frontmostWindowFrame(
+            windowInfo: windows,
+            processIdentifier: 501
+        ) == CGRect(x: 100, y: 50, width: 1_200, height: 800))
+        #expect(KeyboardInjector.frontmostWindowFrame(
+            windowInfo: windows,
+            processIdentifier: 999
+        ) == nil)
     }
 
     @Test func hidReportsRouteOnlyToTheirActivePhysicalRemote() {
@@ -318,7 +394,8 @@ struct RemoteButtonsTests {
     @Test func navigationRepeatStopsOnlyWhileRemoteMicIsFrontmost() throws {
         let remoteMic = PresetApplication.remoteMic.bundleIdentifier
         for action in [
-            ButtonAction.arrowUp, .arrowDown, .arrowLeft, .arrowRight, .deleteBackward,
+            ButtonAction.arrowUp, .arrowDown, .arrowLeft, .arrowRight, .scrollUp, .scrollDown,
+            .deleteBackward,
         ] {
             #expect(!HIDRemoteMonitor.shouldRepeat(
                 action: action,

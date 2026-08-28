@@ -851,7 +851,9 @@ final class HIDRemoteMonitor {
         guard frontmostBundleIdentifier == PresetApplication.remoteMic.bundleIdentifier else {
             return true
         }
-        return ![.arrowUp, .arrowDown, .arrowLeft, .arrowRight, .deleteBackward].contains(action)
+        return ![
+            .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .scrollUp, .scrollDown, .deleteBackward,
+        ].contains(action)
     }
 
     private func shouldUseNativePassthrough(

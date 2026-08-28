@@ -81,12 +81,23 @@ commit_sha="$(git rev-parse HEAD)"
 for locale in zh-Hans en; do
   history_path="$ROOT/Resources/$locale.lproj/ReleaseHistory.md"
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
+  commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    first_note="修复已知问题，提升遥控器兼容性与运行稳定性。"
-    second_note="优化更新流程与界面体验。"
+    if [[ "$commit_subject" == *"remote scroll actions"* ]]; then
+      first_note="新增遥控器向上滚动和向下滚动动作，可直接控制聊天窗口内容。"
+      second_note="滚动事件优先定位前台窗口，无法取得窗口信息时安全回退到当前指针位置。"
+    else
+      first_note="修复已知问题，提升遥控器兼容性与运行稳定性。"
+      second_note="优化更新流程与界面体验。"
+    fi
   else
-    first_note="Fixed known issues and improved remote compatibility and runtime stability."
-    second_note="Refined the update flow and overall interface experience."
+    if [[ "$commit_subject" == *"remote scroll actions"* ]]; then
+      first_note="Added remote-control actions for scrolling up and down in conversation windows."
+      second_note="Scroll events target the frontmost window and safely fall back to the current pointer location when needed."
+    else
+      first_note="Fixed known issues and improved remote compatibility and runtime stability."
+      second_note="Refined the update flow and overall interface experience."
+    fi
   fi
   {
     print "## $version"
