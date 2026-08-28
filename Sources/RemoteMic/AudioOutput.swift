@@ -306,6 +306,18 @@ enum VirtualAudioConnectionLifecyclePolicy {
     }
 }
 
+/// A default-system-output notification is emitted when macOS changes its
+/// routing, even when our explicitly selected output remains healthy. Avoid
+/// tearing down a working virtual output in that case.
+enum VirtualAudioRecoveryPolicy {
+    static func shouldIgnoreDefaultSystemOutputChange(
+        details: String,
+        configurationHealthy: Bool
+    ) -> Bool {
+        details == "properties=default_system_output" && configurationHealthy
+    }
+}
+
 enum VirtualAudioHealthPolicy {
     static func isPlaybackReady(
         hasSelectedDevice: Bool,
@@ -387,6 +399,10 @@ final class VirtualAudioOutput {
     @discardableResult
     func configure(deviceUID: String) -> Bool {
         configure(deviceUID: deviceUID, sampleRate: currentSampleRate)
+    }
+
+    var isConfigurationHealthyForDiagnostics: Bool {
+        isConfigurationHealthy
     }
 
     @discardableResult
@@ -849,11 +865,14 @@ final class VirtualAudioOutput {
         return CoreAudioDeviceCatalog.deviceInfo(for: deviceID)
     }
 
-    private func logRejectedWrite() {
+    private func logRejectedWrite(reason: String = "not_ready") {
         rejectedWriteCount += 1
         let now = Date()
         guard now.timeIntervalSince(lastRejectedWriteLogDate) >= 1 else { return }
         lastRejectedWriteLogDate = now
-        AppLogger.shared.write("AUDIO WRITE rejected count=\(rejectedWriteCount) state={\(basicDiagnosticState())}")
+        AppLogger.shared.write(
+            "AUDIO WRITE rejected count=\(rejectedWriteCount) reason=\(reason) " +
+                "state={\(diagnosticState())}"
+        )
     }
 }

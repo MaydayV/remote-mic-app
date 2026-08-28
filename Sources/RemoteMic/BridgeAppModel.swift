@@ -282,6 +282,27 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
     }
 
+    private func recoverBluetoothAfterSystemWake() {
+        let targets: [XiaomiBluetoothBridge]
+        if let selectedBluetoothBridge {
+            targets = [selectedBluetoothBridge]
+        } else {
+            targets = Array(bluetoothBridges.values)
+        }
+        AppLogger.shared.write(
+            "BLE WAKE recovery_begin target_bridges=\(targets.count) " +
+                "discovery=\(discoveryBluetoothBridge != nil) " +
+                "ready_bridges=\(readyBluetoothBridgeCount)"
+        )
+        if targets.isEmpty, discoveryBluetoothBridge == nil {
+            startBluetoothConnections()
+            AppLogger.shared.write("BLE WAKE recovery_started_missing_bridges")
+            return
+        }
+        targets.forEach { $0.recoverAfterSystemWake() }
+        discoveryBluetoothBridge?.recoverAfterSystemWake()
+    }
+
     func refreshRemoteDiscovery() {
         guard started else { return }
         if discoveryBluetoothBridge == nil {
@@ -493,6 +514,18 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             guard let self, self.started else { return }
             guard !self.settings.selectedAudioDeviceUID.isEmpty else {
                 AppLogger.shared.write("AUDIO RECOVERY ignored reason=\(reason) detail=\(details) no_selected_device")
+                return
+            }
+            let configurationHealthy = self.audioOutput.isConfigurationHealthyForDiagnostics
+            guard !VirtualAudioRecoveryPolicy.shouldIgnoreDefaultSystemOutputChange(
+                details: details,
+                configurationHealthy: configurationHealthy
+            ) else {
+                self.refreshAudioDevices()
+                AppLogger.shared.write(
+                    "AUDIO RECOVERY ignored reason=\(reason) detail=\(details) " +
+                        "explicit_output_healthy=true state={\(self.audioOutput.diagnosticState())}"
+                )
                 return
             }
             guard details != "properties=default_input" else {
@@ -1761,6 +1794,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             return
         }
         resumeVirtualAudioOutputIfNeeded(reason: "system_\(event.rawValue)")
+        if BluetoothWakeRecoveryPolicy.shouldForceReconnect(event: event, started: started) {
+            recoverBluetoothAfterSystemWake()
+        }
     }
 
     private var selectedAudioDeviceIsAvailable: Bool {

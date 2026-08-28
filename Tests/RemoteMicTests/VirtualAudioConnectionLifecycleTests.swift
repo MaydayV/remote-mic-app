@@ -59,6 +59,21 @@ struct VirtualAudioConnectionLifecycleTests {
         ))
     }
 
+    @Test func healthyExplicitOutputIgnoresDefaultSystemOutputNotifications() {
+        #expect(VirtualAudioRecoveryPolicy.shouldIgnoreDefaultSystemOutputChange(
+            details: "properties=default_system_output",
+            configurationHealthy: true
+        ))
+        #expect(!VirtualAudioRecoveryPolicy.shouldIgnoreDefaultSystemOutputChange(
+            details: "properties=default_system_output",
+            configurationHealthy: false
+        ))
+        #expect(!VirtualAudioRecoveryPolicy.shouldIgnoreDefaultSystemOutputChange(
+            details: "properties=devices",
+            configurationHealthy: true
+        ))
+    }
+
     @Test func fallbackPrefersBuiltInInputAndExcludesVirtualDevice() {
         let virtual = AudioDeviceInfo(id: 1, uid: "virtual", name: "MiRemoteV 2ch")
         let usb = AudioDeviceInfo(id: 2, uid: "usb", name: "USB Microphone")

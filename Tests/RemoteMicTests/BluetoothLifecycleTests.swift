@@ -15,6 +15,21 @@ struct BluetoothLifecycleTests {
             .acceptsDidFailToConnect(generation: 1))
     }
 
+    @Test func wakeRecoveryOnlyReconnectsAfterAStartedSystemWake() {
+        #expect(BluetoothWakeRecoveryPolicy.shouldForceReconnect(
+            event: .systemDidWake,
+            started: true
+        ))
+        #expect(!BluetoothWakeRecoveryPolicy.shouldForceReconnect(
+            event: .systemDidWake,
+            started: false
+        ))
+        #expect(!BluetoothWakeRecoveryPolicy.shouldForceReconnect(
+            event: .screenDidWake,
+            started: true
+        ))
+    }
+
     @Test func initializationCapabilitiesAndReadyAreDistinct() {
         #expect(BluetoothLifecyclePhase.discovering(1)
             .acceptsInitializationCallback(generation: 1))
