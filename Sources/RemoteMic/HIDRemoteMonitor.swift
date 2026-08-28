@@ -686,8 +686,14 @@ final class HIDRemoteMonitor {
                 guard shouldAcceptRawPress(
                     button: button,
                     action: action,
+                    allowsRapidPress: settings.allowsRapidPress(for: button, profileID: profileID),
                     frontmostBundleIdentifier: frontmostBundleIdentifier()
-                ) else { continue }
+                ) else {
+                    diagnosticLogger(
+                        "HID PRESS rejected button=\(button.rawValue) reason=awaiting_stable_release"
+                    )
+                    continue
+                }
                 diagnosticLogger(
                     "HID GESTURE button=\(button.rawValue) trigger=singleClick path=raw"
                 )
@@ -833,12 +839,17 @@ final class HIDRemoteMonitor {
     func shouldAcceptRawPress(
         button: RemoteButton,
         action: ButtonAction,
+        allowsRapidPress: Bool = false,
         frontmostBundleIdentifier: String? = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     ) -> Bool {
         guard !Self.shouldRepeat(
             action: action,
             frontmostBundleIdentifier: frontmostBundleIdentifier
         ) else { return true }
+        if allowsRapidPress {
+            finishNonRepeatablePress(button)
+            return true
+        }
         nonRepeatableReleaseTimers.removeValue(forKey: button)?.cancel()
         return nonRepeatablePressedButtons.insert(button).inserted
     }

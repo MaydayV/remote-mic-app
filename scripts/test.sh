@@ -9,6 +9,7 @@ xcrun swiftc \
   "$ROOT/Sources/RemoteMic/ATVVProtocol.swift" \
   "$ROOT/Sources/RemoteMic/SystemAudioLifecycle.swift" \
   "$ROOT/Sources/RemoteMic/BluetoothLifecycle.swift" \
+  "$ROOT/Sources/RemoteMic/VoiceKeyMode.swift" \
   "$ROOT/Sources/RemoteMic/RemoteButtons.swift" \
   "$ROOT/Sources/RemoteMic/RemoteDeviceProfile.swift" \
   "$ROOT/Sources/RemoteMic/RemoteBackend.swift" \

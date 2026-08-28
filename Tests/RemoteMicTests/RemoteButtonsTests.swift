@@ -7,6 +7,42 @@ import Testing
 
 @Suite("Remote buttons")
 struct RemoteButtonsTests {
+    @Test func voiceKeyModesMapToExpectedPhysicalKeys() {
+        #expect(VoiceKeyMode.function.keyCode == 63)
+        #expect(VoiceKeyMode.leftCommand.keyCode == KeyboardInjector.leftCommandKeyCode)
+        #expect(VoiceKeyMode.rightCommand.keyCode == KeyboardInjector.rightCommandKeyCode)
+        #expect(!VoiceKeyMode.function.requiresAccessibility)
+        #expect(VoiceKeyMode.leftCommand.requiresAccessibility)
+    }
+
+    @Test func voiceKeyModesPostMatchingModifierFlags() {
+        var posted: [(CGKeyCode, Bool, CGEventFlags)] = []
+        let poster: KeyboardInjector.KeyStatePoster = { code, pressed, flags in
+            posted.append((code, pressed, flags))
+            return true
+        }
+        #expect(KeyboardInjector.setVoiceKeyPressed(
+            mode: .leftCommand, isPressed: true, accessibilityTrusted: { true }, keyStatePoster: poster
+        ))
+        #expect(KeyboardInjector.setVoiceKeyPressed(
+            mode: .leftCommand, isPressed: false, accessibilityTrusted: { true }, keyStatePoster: poster
+        ))
+        #expect(posted[0].0 == KeyboardInjector.leftCommandKeyCode)
+        #expect(posted[0].2.contains(.maskCommand))
+        #expect(posted[1].0 == KeyboardInjector.leftCommandKeyCode)
+        #expect(posted[1].2.isEmpty)
+    }
+
+    @Test func rapidPressOptInClearsNonRepeatableReleaseLatch() {
+        let monitor = HIDRemoteMonitor(
+            settings: AppSettings(defaults: UserDefaults(suiteName: "RemoteMicTests.rapid.\(UUID().uuidString)")!),
+            actionPerformer: { _, _, _ in true }
+        )
+        #expect(monitor.shouldAcceptRawPress(button: .ok, action: .customShortcut, allowsRapidPress: true))
+        #expect(monitor.shouldAcceptRawPress(button: .ok, action: .customShortcut, allowsRapidPress: true))
+        monitor.stop()
+    }
+
     @Test func exclusiveHIDAccessUsesASeparateUserFacingFailure() {
         #expect(HIDRemoteMonitor.deviceOpenFailureMessageKey(
             result: kIOReturnExclusiveAccess,

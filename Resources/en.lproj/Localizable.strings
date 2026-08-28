@@ -556,3 +556,6 @@
 "connection.voice_key.mode.left_command" = "Left Command";
 "connection.voice_key.mode.right_command" = "Right Command";
 "connection.voice_key.mode.hint" = "Choose the key emitted while voice capture is active. Command modes require Accessibility permission.";
+"button_mapping.rapid_press" = "Allow rapid repeated presses";
+"button_mapping.rapid_press_hint_short" = "Useful for quick repeated taps. Holding may trigger multiple actions.";
+"button_mapping.rapid_press_help" = "Bypasses the stable-release guard for this non-repeatable action. Use only when the remote produces distinct press events.";
