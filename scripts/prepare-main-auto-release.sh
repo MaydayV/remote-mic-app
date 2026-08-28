@@ -83,7 +83,10 @@ for locale in zh-Hans en; do
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    if [[ "$commit_subject" == *"remote scroll actions"* ]]; then
+    if [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
+      first_note="新增微信输入法自动切换，以及 Fn、左 Command、右 Command 三种语音键模式。"
+      second_note="不可重复的自定义动作可按按钮单独允许快速连续点按；默认行为和原有 Fn 路径保持不变。"
+    elif [[ "$commit_subject" == *"remote scroll actions"* ]]; then
       first_note="新增遥控器向上滚动和向下滚动动作，可直接控制聊天窗口内容。"
       second_note="滚动事件优先定位前台窗口，无法取得窗口信息时安全回退到当前指针位置。"
     else
@@ -91,7 +94,10 @@ for locale in zh-Hans en; do
       second_note="优化更新流程与界面体验。"
     fi
   else
-    if [[ "$commit_subject" == *"remote scroll actions"* ]]; then
+    if [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
+      first_note="Added WeChat input-method switching and Fn, Left Command, and Right Command voice-key modes."
+      second_note="Non-repeatable custom actions can opt into rapid repeated presses; existing defaults and the Fn path remain unchanged."
+    elif [[ "$commit_subject" == *"remote scroll actions"* ]]; then
       first_note="Added remote-control actions for scrolling up and down in conversation windows."
       second_note="Scroll events target the frontmost window and safely fall back to the current pointer location when needed."
     else
