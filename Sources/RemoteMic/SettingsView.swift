@@ -1042,6 +1042,22 @@ struct SettingsView: View {
                 }
                 .help(localization.text("connection.voice_fn_tap.hint"))
 
+                VStack(alignment: .leading, spacing: 2) {
+                    Picker("connection.voice_key.mode.title", selection: Binding(
+                        get: { settings.voiceKeyMode },
+                        set: { model.setVoiceKeyMode($0) }
+                    )) {
+                        ForEach(VoiceKeyMode.allCases) { mode in
+                            Text(localization.text(mode.localizationKey)).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    Text("connection.voice_key.mode.hint")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
                 Spacer(minLength: 0)
 
                 Button("common.action.restore_defaults") {

@@ -23,6 +23,7 @@ enum KeyboardInjector {
     typealias ScrollPoster = (Int32) -> Void
 
     static let leftCommandKeyCode: CGKeyCode = 55
+    static let rightCommandKeyCode: CGKeyCode = 54
 
     final class AppSwitcherSession {
         private let keyStatePoster: KeyStatePoster
@@ -166,6 +167,24 @@ enum KeyboardInjector {
             isPressed,
             isPressed ? .maskSecondaryFn : []
         )
+    }
+
+    @discardableResult
+    static func setVoiceKeyPressed(
+        mode: VoiceKeyMode,
+        isPressed: Bool,
+        accessibilityTrusted: () -> Bool = { isAccessibilityTrusted },
+        keyStatePoster: KeyStatePoster = postKeyState
+    ) -> Bool {
+        guard accessibilityTrusted() else { return false }
+        let flags: CGEventFlags
+        switch mode {
+        case .function:
+            flags = isPressed ? .maskSecondaryFn : []
+        case .leftCommand, .rightCommand:
+            flags = isPressed ? .maskCommand : []
+        }
+        return keyStatePoster(CGKeyCode(mode.keyCode), isPressed, flags)
     }
 
     @discardableResult

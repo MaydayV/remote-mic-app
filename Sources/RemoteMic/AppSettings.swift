@@ -21,6 +21,7 @@ private struct PersonalizedConfiguration: Codable {
     let openMainWindowAtLaunch: Bool?
     let experimentalContinuousRecordingEnabled: Bool?
     let voiceFnTapModeEnabled: Bool?
+    let voiceKeyMode: VoiceKeyMode?
     let continuousRecordingPowerBindingBackup: ConfiguredButtonAction?
 }
 
@@ -239,6 +240,7 @@ final class AppSettings: ObservableObject {
         static let openMainWindowAtLaunch = "openMainWindowAtLaunch"
         static let experimentalContinuousRecordingEnabled = "experimentalContinuousRecordingEnabled"
         static let voiceFnTapModeEnabled = "voiceFnTapModeEnabled"
+        static let voiceKeyMode = "voiceKeyMode"
         static let continuousRecordingPowerBindingBackup = "continuousRecordingPowerBindingBackup"
         static let lastLaunchedBuild = "launch.lastLaunchedBuild"
         static let totalButtonPressCount = "usage.totalButtonPressCount"
@@ -336,6 +338,10 @@ final class AppSettings: ObservableObject {
                 forKey: Keys.voiceFnTapModeEnabled
             )
         }
+    }
+
+    @Published var voiceKeyMode: VoiceKeyMode {
+        didSet { defaults.set(voiceKeyMode.rawValue, forKey: Keys.voiceKeyMode) }
     }
 
     private var continuousRecordingPowerBindingBackup: ConfiguredButtonAction? {
@@ -494,6 +500,9 @@ final class AppSettings: ObservableObject {
         voiceFnTapModeEnabled = defaults.bool(
             forKey: Keys.voiceFnTapModeEnabled
         )
+        voiceKeyMode = VoiceKeyMode(
+            rawValue: defaults.string(forKey: Keys.voiceKeyMode) ?? ""
+        ) ?? .function
         continuousRecordingPowerBindingBackup = defaults
             .data(forKey: Keys.continuousRecordingPowerBindingBackup)
             .flatMap { try? JSONDecoder().decode(ConfiguredButtonAction.self, from: $0) }
@@ -603,7 +612,10 @@ final class AppSettings: ObservableObject {
     }
 
     func setOnboardingVoiceTool(_ voiceTool: OnboardingVoiceTool) {
-        let shouldEnableFnTap = voiceTool == .typeless
+        if voiceTool == .typeless, voiceKeyMode != .function {
+            voiceKeyMode = .function
+        }
+        let shouldEnableFnTap = voiceTool == .typeless && voiceKeyMode == .function
         if voiceFnTapModeEnabled != shouldEnableFnTap {
             voiceFnTapModeEnabled = shouldEnableFnTap
         }
@@ -1195,6 +1207,7 @@ final class AppSettings: ObservableObject {
             openMainWindowAtLaunch: openMainWindowAtLaunch,
             experimentalContinuousRecordingEnabled: experimentalContinuousRecordingEnabled,
             voiceFnTapModeEnabled: voiceFnTapModeEnabled,
+            voiceKeyMode: voiceKeyMode,
             continuousRecordingPowerBindingBackup: continuousRecordingPowerBindingBackup
         )
         let encoder = JSONEncoder()
@@ -1253,6 +1266,8 @@ final class AppSettings: ObservableObject {
             self.openMainWindowAtLaunch = openMainWindowAtLaunch
         }
         voiceFnTapModeEnabled = configuration.voiceFnTapModeEnabled ?? false
+        voiceKeyMode = configuration.voiceKeyMode ?? .function
+        if voiceKeyMode != .function { voiceFnTapModeEnabled = false }
         applyContinuousRecordingExperimentState(
             enabled: configuration.experimentalContinuousRecordingEnabled ?? false,
             backup: configuration.continuousRecordingPowerBindingBackup

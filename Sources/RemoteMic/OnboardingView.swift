@@ -256,7 +256,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 10) {
-                ForEach([OnboardingVoiceTool.doubao, .typeless, .other]) { tool in
+                ForEach([OnboardingVoiceTool.doubao, .weixin, .typeless, .other]) { tool in
                     Button {
                         settings.setOnboardingVoiceTool(tool)
                     } label: {
@@ -1054,6 +1054,7 @@ struct OnboardingView: View {
     private func voiceToolIcon(_ tool: OnboardingVoiceTool) -> String {
         switch tool {
         case .doubao: return "quote.bubble.fill"
+        case .weixin: return "message.fill"
         case .typeless: return "waveform.badge.mic"
         case .other: return "ellipsis.circle.fill"
         case .unselected: return "circle"

@@ -97,6 +97,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             self?.handleVoiceFnTapFailure(failure)
         }
     )
+    private lazy var preferredInputSourceMonitor = PreferredInputSourceMonitor(
+        voiceTool: { [weak self] in self?.settings.onboardingVoiceTool ?? .other }
+    )
+    private var voiceKeyIsHeld = false
+    private var heldVoiceKeyMode: VoiceKeyMode?
     private var testToneGeneration = 0
     private var voiceSessionStartedAt: Date?
     private var voiceSessionUsageSource: UsageEventSource?
@@ -171,6 +176,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         startAudioSubsystem()
         applyHIDSettings()
+        preferredInputSourceMonitor.start()
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
@@ -208,6 +214,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         stopLongRecording(reason: "app_stop")
         voiceInputDestinationCoordinator.shutdown()
         voiceFnTapSession.shutdown()
+        preferredInputSourceMonitor.stop()
+        releaseVoiceKeyIfNeeded()
         bluetoothBridges.values.forEach { $0.stop() }
         discoveryBluetoothBridge?.stop()
         bluetoothBridges.removeAll()
@@ -686,7 +694,15 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             stopLongRecording(reason: "feature_disabled")
         }
 
-        let requestedFnTapMode = settings.voiceFnTapModeEnabled
+        var requestedVoiceKeyMode = settings.voiceKeyMode
+        if requestedVoiceKeyMode.requiresAccessibility && !KeyboardInjector.isAccessibilityTrusted {
+            requestedVoiceKeyMode = .function
+            if settings.voiceKeyMode != .function { settings.voiceKeyMode = .function }
+        }
+        if !requestedVoiceKeyMode.usesHardwareMapping, settings.voiceFnTapModeEnabled {
+            settings.voiceFnTapModeEnabled = false
+        }
+        let requestedFnTapMode = requestedVoiceKeyMode == .function && settings.voiceFnTapModeEnabled
         if !requestedFnTapMode, voiceFnTapSession.requiresCleanupBeforeMapping {
             voiceFnTapSession.setEnabled(false) { [weak self] in
                 self?.applyHIDSettings(
@@ -695,13 +711,23 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             }
             return
         }
-        requestNextHIDPermissionIfNeeded(voiceFnTapModeRequested: requestedFnTapMode)
+        requestNextHIDPermissionIfNeeded(
+            voiceFnTapModeRequested: requestedFnTapMode,
+            voiceKeyMode: requestedVoiceKeyMode
+        )
         var powerKeySuppressed: Bool
         let canFallbackVoiceKeyMode = Self.canFallbackVoiceKeyMode(
             isStreaming: isStreaming,
             allowVoiceKeyModeFallback: allowVoiceKeyModeFallback
         )
-        if requestedFnTapMode, KeyboardInjector.isAccessibilityTrusted {
+        if requestedVoiceKeyMode != .function {
+            voiceFnTapSession.setEnabled(false)
+            powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: true)
+            if !voiceFunctionMapper.isVoiceKeyNeutralized, canFallbackVoiceKeyMode {
+                settings.voiceKeyMode = .function
+                powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: false)
+            }
+        } else if requestedFnTapMode, KeyboardInjector.isAccessibilityTrusted {
             powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: true)
             if voiceFunctionMapper.isVoiceKeyNeutralized {
                 voiceFnTapSession.setEnabled(true)
@@ -866,6 +892,15 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
     }
 
+    func setVoiceKeyMode(_ mode: VoiceKeyMode) {
+        guard mode != settings.voiceKeyMode else { return }
+        guard !isStreaming else { return }
+        releaseVoiceKeyIfNeeded()
+        settings.voiceKeyMode = mode
+        if mode != .function { settings.voiceFnTapModeEnabled = false }
+        applyHIDSettings()
+    }
+
     private func enableVoiceFnTapMode() {
         guard KeyboardInjector.isAccessibilityTrusted else {
             settings.voiceFnTapModeEnabled = false
@@ -895,11 +930,13 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     }
 
     private func requestNextHIDPermissionIfNeeded(
-        voiceFnTapModeRequested: Bool? = nil
+        voiceFnTapModeRequested: Bool? = nil,
+        voiceKeyMode: VoiceKeyMode? = nil
     ) {
         let request = HIDPermissionGate.nextPermissionRequest(
             mappingEnabled: settings.customMappingEnabled,
             voiceFnTapModeEnabled: voiceFnTapModeRequested ?? settings.voiceFnTapModeEnabled,
+            voiceKeyMode: voiceKeyMode ?? settings.voiceKeyMode,
             inputMonitoringGranted: HIDRemoteMonitor.isInputMonitoringGranted,
             accessibilityGranted: KeyboardInjector.isAccessibilityTrusted
         )
@@ -911,6 +948,30 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         case .accessibility:
             _ = KeyboardInjector.requestAccessibilityAccess()
         }
+    }
+
+    private func updateVoiceKeyState(streaming: Bool) {
+        let mode = settings.voiceKeyMode
+        if streaming {
+            guard !voiceKeyIsHeld else { return }
+            guard KeyboardInjector.setVoiceKeyPressed(mode: mode, isPressed: true) else {
+                AppLogger.shared.write("VOICE KEY press_failed mode=\(mode.rawValue)")
+                return
+            }
+            voiceKeyIsHeld = true
+            heldVoiceKeyMode = mode
+            if mode != .function { preferredInputSourceMonitor.beginVoiceSession() }
+        } else {
+            releaseVoiceKeyIfNeeded()
+        }
+    }
+
+    private func releaseVoiceKeyIfNeeded() {
+        guard voiceKeyIsHeld, let mode = heldVoiceKeyMode else { return }
+        _ = KeyboardInjector.setVoiceKeyPressed(mode: mode, isPressed: false)
+        voiceKeyIsHeld = false
+        heldVoiceKeyMode = nil
+        if mode != .function { preferredInputSourceMonitor.endVoiceSession() }
     }
 
     func requestInputMonitoringPermission() {
@@ -1056,6 +1117,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         voiceFnTapSession.resume()
         _ = voiceFnTapSession.startVoice()
         beginVoiceSessionIfNeeded()
+        updateVoiceKeyState(streaming: true)
         AppLogger.shared.write("SIRI REMOTE voice started")
     }
 
@@ -1080,6 +1142,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private func finishSiriRemoteVoice(reason: String) {
         guard siriRemoteVoiceActive else { return }
         siriRemoteVoiceActive = false
+        updateVoiceKeyState(streaming: false)
         _ = voiceFnTapSession.stopVoice()
         endVoiceSessionIfNeeded(flushAudio: false)
         releaseVirtualAudioOutputIfUnused(reason: "siri_voice_\(reason)")
@@ -1299,6 +1362,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         _ = voiceFnTapSession.startVoice()
         beginVoiceSessionIfNeeded()
+        updateVoiceKeyState(streaming: true)
     }
 
     func bluetoothBridgeDidStopVoice(_ bridge: XiaomiBluetoothBridge) {
@@ -1314,6 +1378,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             AppLogger.shared.write("LONG RECORDING close_confirmed")
         }
         let handledByFnTapMode = voiceFnTapSession.stopVoice()
+        updateVoiceKeyState(streaming: false)
         let shouldFlushAudio = BluetoothVoiceStopPolicy.shouldFlushAudio(
             handledByFnTapMode: handledByFnTapMode
         )

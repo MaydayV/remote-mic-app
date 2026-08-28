@@ -414,6 +414,8 @@
 "onboarding.voice_tool.unselected.detail" = "No voice tool selected yet.";
 "onboarding.voice_tool.doubao.title" = "Doubao Input Method";
 "onboarding.voice_tool.doubao.detail" = "Send remote audio to Doubao through your selected voice output device.";
+"onboarding.voice_tool.weixin.title" = "WeChat Input Method";
+"onboarding.voice_tool.weixin.detail" = "Temporarily switches to WeChat Pinyin while you hold the voice key, then restores your previous input source.";
 "onboarding.voice_tool.typeless.title" = "Typeless";
 "onboarding.voice_tool.typeless.detail" = "The voice key taps Fn and sends audio from the remote.";
 "onboarding.voice_tool.other.title" = "Another Voice Tool";
@@ -549,3 +551,8 @@
 "remote.backend.siri_voice_fixed_detail" = "The Siri button is reserved for push-to-talk and follows the voice-input settings.";
 
 "connection.remote.xiaomi_detail" = "Bluetooth remote with voice input and custom key mapping.";
+"connection.voice_key.mode.title" = "Voice key";
+"connection.voice_key.mode.fn" = "Fn / Globe";
+"connection.voice_key.mode.left_command" = "Left Command";
+"connection.voice_key.mode.right_command" = "Right Command";
+"connection.voice_key.mode.hint" = "Choose the key emitted while voice capture is active. Command modes require Accessibility permission.";

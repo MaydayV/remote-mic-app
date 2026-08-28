@@ -61,6 +61,7 @@ enum OnboardingPhase: String, CaseIterable {
 enum OnboardingVoiceTool: String, CaseIterable, Codable, Identifiable {
     case unselected
     case doubao
+    case weixin
     case typeless
     case other
 
@@ -72,6 +73,14 @@ enum OnboardingVoiceTool: String, CaseIterable, Codable, Identifiable {
 
     var detailKey: String {
         "onboarding.voice_tool.\(rawValue).detail"
+    }
+
+    var preferredInputSourceID: String? {
+        switch self {
+        case .doubao: return "com.bytedance.inputmethod.doubaoime.pinyin"
+        case .weixin: return "com.tencent.inputmethod.wetype.pinyin"
+        default: return nil
+        }
     }
 }
 
@@ -216,4 +225,3 @@ enum CompletedUpdatePermissionRepairPolicy {
             (!bluetoothGranted || !inputMonitoringGranted || !accessibilityGranted)
     }
 }
-

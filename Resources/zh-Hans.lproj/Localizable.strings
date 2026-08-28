@@ -414,6 +414,8 @@
 "onboarding.voice_tool.unselected.detail" = "尚未选择常用语音工具。";
 "onboarding.voice_tool.doubao.title" = "豆包输入法";
 "onboarding.voice_tool.doubao.detail" = "使用你选择的语音输出设备，把遥控器声音送入豆包输入法。";
+"onboarding.voice_tool.weixin.title" = "微信输入法";
+"onboarding.voice_tool.weixin.detail" = "按住语音键时临时切换到微信拼音输入法，松开后恢复之前的输入法。";
 "onboarding.voice_tool.typeless.title" = "Typeless";
 "onboarding.voice_tool.typeless.detail" = "语音键会模拟 Fn 点按并传送遥控器声音。";
 "onboarding.voice_tool.other.title" = "其他语音工具";
@@ -549,3 +551,8 @@
 "remote.backend.siri_voice_fixed_detail" = "Siri 键固定用于按住说话，并遵循语音输入设置。";
 
 "connection.remote.xiaomi_detail" = "支持语音输入与自定义按键映射的蓝牙遥控器。";
+"connection.voice_key.mode.title" = "语音键";
+"connection.voice_key.mode.fn" = "Fn / 地球";
+"connection.voice_key.mode.left_command" = "左 Command";
+"connection.voice_key.mode.right_command" = "右 Command";
+"connection.voice_key.mode.hint" = "选择语音采集期间模拟的按键。Command 模式需要辅助功能权限。";
