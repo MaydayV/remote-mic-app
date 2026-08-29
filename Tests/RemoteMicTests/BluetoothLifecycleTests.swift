@@ -30,6 +30,34 @@ struct BluetoothLifecycleTests {
         ))
     }
 
+    @Test func HIDMappingRecoveryBacksOffAndStopsWhenReady() {
+        #expect(HIDMappingRecoveryPolicy.retryDelays == [0.5, 1, 2, 4, 8])
+        #expect(HIDMappingRecoveryPolicy.retryDelay(
+            forAttempt: 0,
+            started: true,
+            readyBridgeCount: 1,
+            hasMatchingServices: false
+        ) == 0.5)
+        #expect(HIDMappingRecoveryPolicy.retryDelay(
+            forAttempt: 4,
+            started: true,
+            readyBridgeCount: 1,
+            hasMatchingServices: false
+        ) == 8)
+        #expect(HIDMappingRecoveryPolicy.retryDelay(
+            forAttempt: 5,
+            started: true,
+            readyBridgeCount: 1,
+            hasMatchingServices: false
+        ) == nil)
+        #expect(HIDMappingRecoveryPolicy.retryDelay(
+            forAttempt: 0,
+            started: true,
+            readyBridgeCount: 1,
+            hasMatchingServices: true
+        ) == nil)
+    }
+
     @Test func initializationCapabilitiesAndReadyAreDistinct() {
         #expect(BluetoothLifecyclePhase.discovering(1)
             .acceptsInitializationCallback(generation: 1))

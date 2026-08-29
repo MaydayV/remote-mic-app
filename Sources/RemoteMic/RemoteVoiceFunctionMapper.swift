@@ -128,6 +128,12 @@ final class RemoteVoiceFunctionMapper {
     private(set) var powerSuppressedLocationIDs: Set<UInt32>?
     private(set) var isVoiceKeyNeutralized = false
 
+    /// The HID service can appear a few seconds after Bluetooth reports ready.
+    /// Expose a cheap, side-effect-free probe so the app can retry mapping
+    /// without changing the existing mapping transaction semantics.
+    var hasMatchingServices: Bool { !serviceProvider().isEmpty }
+    var matchedServiceCount: Int { serviceProvider().count }
+
     init(serviceProvider: @escaping ServiceProvider = RemoteVoiceFunctionMapper.systemServices) {
         self.serviceProvider = serviceProvider
     }
