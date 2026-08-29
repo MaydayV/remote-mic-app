@@ -83,7 +83,10 @@ for locale in zh-Hans en; do
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    if [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
+    if [[ "$commit_subject" == *"HID mapping"* ]]; then
+      first_note="修复系统唤醒后蓝牙已连接但 HID 服务延迟出现时，遥控器按键映射可能失效的问题。"
+      second_note="现在会在有限时间内自动退避重试，并在成功、断开或关闭软件时安全停止。"
+    elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
       first_note="新增微信输入法自动切换，以及 Fn、左 Command、右 Command 三种语音键模式。"
       second_note="不可重复的自定义动作可按按钮单独允许快速连续点按；默认行为和原有 Fn 路径保持不变。"
     elif [[ "$commit_subject" == *"remote scroll actions"* ]]; then
@@ -94,7 +97,10 @@ for locale in zh-Hans en; do
       second_note="优化更新流程与界面体验。"
     fi
   else
-    if [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
+    if [[ "$commit_subject" == *"HID mapping"* ]]; then
+      first_note="Fixed remote button mappings being unavailable when Bluetooth recovered before HID services appeared after system wake."
+      second_note="The app now retries with bounded backoff and stops safely after success, disconnect, or shutdown."
+    elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
       first_note="Added WeChat input-method switching and Fn, Left Command, and Right Command voice-key modes."
       second_note="Non-repeatable custom actions can opt into rapid repeated presses; existing defaults and the Fn path remain unchanged."
     elif [[ "$commit_subject" == *"remote scroll actions"* ]]; then
