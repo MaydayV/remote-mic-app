@@ -83,7 +83,7 @@ for locale in zh-Hans en; do
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    if [[ "$commit_subject" == *"HID mapping"* ]]; then
+    if [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="修复系统唤醒后蓝牙已连接但 HID 服务延迟出现时，遥控器按键映射可能失效的问题。"
       second_note="现在会在有限时间内自动退避重试，并在成功、断开或关闭软件时安全停止。"
     elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
@@ -97,7 +97,7 @@ for locale in zh-Hans en; do
       second_note="优化更新流程与界面体验。"
     fi
   else
-    if [[ "$commit_subject" == *"HID mapping"* ]]; then
+    if [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="Fixed remote button mappings being unavailable when Bluetooth recovered before HID services appeared after system wake."
       second_note="The app now retries with bounded backoff and stops safely after success, disconnect, or shutdown."
     elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
