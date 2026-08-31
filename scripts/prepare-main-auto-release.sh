@@ -92,6 +92,9 @@ for locale in zh-Hans en; do
     elif [[ "$commit_subject" == *"input fallback"* ]]; then
       first_note="记住用户最后选择的实体输入设备，并在虚拟麦克风暂时不可用时优先恢复。"
       second_note="用户手动切换输入设备后不会被覆盖，虚拟设备恢复时仍会安全处理默认输入。"
+    elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"discovery"* ]]; then
+      first_note="修复唤醒后 HID 发现管理器卡住、遥控器按键迟迟无法恢复的问题。"
+      second_note="现在会有限次数重建发现管理器，并在收到有效按键后停止恢复任务，避免持续轮询。"
     elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="修复系统唤醒后蓝牙已连接但 HID 服务延迟出现时，遥控器按键映射可能失效的问题。"
       second_note="现在会在有限时间内自动退避重试，并在成功、断开或关闭软件时安全停止。"
@@ -115,6 +118,9 @@ for locale in zh-Hans en; do
     elif [[ "$commit_subject" == *"input fallback"* ]]; then
       first_note="Remembered the user's last physical input and prioritize it when the virtual microphone is temporarily unavailable."
       second_note="Manual input changes are preserved while virtual-device fallback and restoration remain safely managed."
+    elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"discovery"* ]]; then
+      first_note="Fixed the HID discovery manager getting stuck after wake and leaving remote buttons unavailable."
+      second_note="The app now performs bounded manager rebuilds and stops recovery after a valid button report instead of polling forever."
     elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="Fixed remote button mappings being unavailable when Bluetooth recovered before HID services appeared after system wake."
       second_note="The app now retries with bounded backoff and stops safely after success, disconnect, or shutdown."

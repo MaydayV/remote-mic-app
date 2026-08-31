@@ -7,6 +7,37 @@ import Testing
 
 @Suite("Remote buttons")
 struct RemoteButtonsTests {
+    @Test func hidDiscoveryWatchdogPerformsAtMostTwoRebuildsAndResetsOnReport() {
+        let scheduler = RemoteButtonsTestScheduler()
+        let watchdog = HIDDiscoveryRecoveryWatchdog(scheduler: scheduler)
+        var waiting = true
+        var rebuildAttempts: [Int] = []
+
+        func schedule() {
+            watchdog.schedule(
+                isWaiting: { waiting },
+                rebuild: { attempt in
+                    rebuildAttempts.append(attempt)
+                    schedule()
+                }
+            )
+        }
+
+        schedule()
+        scheduler.advance(toMilliseconds: 2_000)
+        scheduler.advance(toMilliseconds: 4_000)
+        scheduler.advance(toMilliseconds: 6_000)
+        #expect(rebuildAttempts == [1, 2])
+        #expect(watchdog.attempt == 2)
+
+        watchdog.handleReport(accepted: true)
+        #expect(watchdog.attempt == 0)
+        waiting = false
+        schedule()
+        scheduler.advance(toMilliseconds: 8_000)
+        #expect(rebuildAttempts == [1, 2])
+    }
+
     @Test func voiceKeyModesMapToExpectedPhysicalKeys() {
         #expect(VoiceKeyMode.function.keyCode == 63)
         #expect(VoiceKeyMode.leftCommand.keyCode == KeyboardInjector.leftCommandKeyCode)
