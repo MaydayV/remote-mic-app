@@ -83,7 +83,16 @@ for locale in zh-Hans en; do
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    if [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
+    if [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
+      first_note="新增单个按键、组合键和单独修饰键的快捷键录入，并记住用户最后选择的实体输入设备。"
+      second_note="虚拟麦克风暂时不可用时，优先恢复用户选择的实体输入设备；快捷键录入不会触发原有系统动作。"
+    elif [[ "$commit_subject" == *"shortcut modifiers"* ]]; then
+      first_note="新增单个按键、组合键和单独修饰键的快捷键录入。"
+      second_note="录入快捷键时会安全拦截本次按键，不触发原有系统或 APP 动作。"
+    elif [[ "$commit_subject" == *"input fallback"* ]]; then
+      first_note="记住用户最后选择的实体输入设备，并在虚拟麦克风暂时不可用时优先恢复。"
+      second_note="用户手动切换输入设备后不会被覆盖，虚拟设备恢复时仍会安全处理默认输入。"
+    elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="修复系统唤醒后蓝牙已连接但 HID 服务延迟出现时，遥控器按键映射可能失效的问题。"
       second_note="现在会在有限时间内自动退避重试，并在成功、断开或关闭软件时安全停止。"
     elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then
@@ -97,7 +106,16 @@ for locale in zh-Hans en; do
       second_note="优化更新流程与界面体验。"
     fi
   else
-    if [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
+    if [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
+      first_note="Added recording for single keys, key combinations, and standalone modifiers, plus remembered physical input fallback."
+      second_note="The app prioritizes the user's last physical input when the virtual microphone is temporarily unavailable and safely suppresses the recorded keystroke."
+    elif [[ "$commit_subject" == *"shortcut modifiers"* ]]; then
+      first_note="Added recording for single keys, key combinations, and standalone modifiers."
+      second_note="Shortcut capture safely suppresses the recorded keystroke so the existing system or app action is not triggered."
+    elif [[ "$commit_subject" == *"input fallback"* ]]; then
+      first_note="Remembered the user's last physical input and prioritize it when the virtual microphone is temporarily unavailable."
+      second_note="Manual input changes are preserved while virtual-device fallback and restoration remain safely managed."
+    elif [[ "$commit_subject" == *"HID"* && "$commit_subject" == *"mapping"* ]]; then
       first_note="Fixed remote button mappings being unavailable when Bluetooth recovered before HID services appeared after system wake."
       second_note="The app now retries with bounded backoff and stops safely after success, disconnect, or shutdown."
     elif [[ "$commit_subject" == *"voice key modes"* || "$commit_subject" == *"rapid presses"* ]]; then

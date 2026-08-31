@@ -499,6 +499,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func startObservingAudioHardware() {
         guard observedAudioHardwareAddresses.isEmpty else { return }
+        rememberCurrentUserInputDeviceIfNeeded(reason: "audio_monitor_start")
         for selector in [
             kAudioHardwarePropertyDevices,
             kAudioHardwarePropertyDefaultInputDevice,
@@ -543,6 +544,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private func scheduleAudioRecovery(reason: String, details: String = "") {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.started else { return }
+            if details == "properties=default_input" {
+                self.rememberCurrentUserInputDeviceIfNeeded(reason: "hardware_change")
+            }
             guard !self.settings.selectedAudioDeviceUID.isEmpty else {
                 AppLogger.shared.write("AUDIO RECOVERY ignored reason=\(reason) detail=\(details) no_selected_device")
                 return
@@ -2042,7 +2046,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         guard !selectedUID.isEmpty,
               CoreAudioDeviceCatalog.defaultInputDevice()?.uid == selectedUID
         else { return }
-        guard let fallback = CoreAudioDeviceCatalog.preferredFallbackInput(excludingUID: selectedUID) else {
+        guard let fallback = preferredFallbackInput(excludingUID: selectedUID) else {
             AppLogger.shared.write("AUDIO DEFAULT_INPUT fallback_failed reason=\(reason) no_candidate")
             return
         }
@@ -2061,6 +2065,25 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         AppLogger.shared.write(
             "AUDIO DEFAULT_INPUT fallback_applied reason=\(reason) " +
                 "target={\(CoreAudioDeviceCatalog.deviceDiagnostic(fallback))}"
+        )
+    }
+
+    private func preferredFallbackInput(excludingUID: String) -> AudioDeviceInfo? {
+        CoreAudioDeviceCatalog.preferredFallbackInput(
+            excludingUID: excludingUID,
+            preferredUID: settings.lastUserSelectedInputDeviceUID
+        )
+    }
+
+    private func rememberCurrentUserInputDeviceIfNeeded(reason: String) {
+        guard managedDefaultInputTransition == nil,
+              let current = CoreAudioDeviceCatalog.defaultInputDevice(),
+              current.uid != settings.selectedAudioDeviceUID,
+              current.uid != settings.lastUserSelectedInputDeviceUID
+        else { return }
+        settings.lastUserSelectedInputDeviceUID = current.uid
+        AppLogger.shared.write(
+            "AUDIO DEFAULT_INPUT remembered reason=\(reason) target={\(CoreAudioDeviceCatalog.deviceDiagnostic(current))}"
         )
     }
 

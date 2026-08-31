@@ -101,6 +101,21 @@ struct VirtualAudioConnectionLifecycleTests {
         #expect(fallback == usb)
     }
 
+    @Test func fallbackPrefersTheUsersRememberedPhysicalInput() {
+        let virtual = AudioDeviceInfo(id: 1, uid: "virtual", name: "MiRemoteV 2ch")
+        let builtIn = AudioDeviceInfo(id: 2, uid: "built-in", name: "MacBook Microphone")
+        let usb = AudioDeviceInfo(id: 3, uid: "usb", name: "USB Microphone")
+
+        let fallback = DefaultInputFallbackPolicy.preferredFallback(
+            in: [virtual, builtIn, usb],
+            excludingUID: virtual.uid,
+            builtInDeviceIDs: [builtIn.id],
+            preferredUID: usb.uid
+        )
+
+        #expect(fallback == usb)
+    }
+
     @Test func reconnectRestoresOnlyTheFallbackManagedByTheApp() {
         #expect(DefaultInputFallbackPolicy.shouldRestoreVirtualInput(
             managedVirtualUID: "virtual",

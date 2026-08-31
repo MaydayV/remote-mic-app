@@ -226,6 +226,7 @@ final class AppSettings: ObservableObject {
         static let gainDB = "gainDB"
         static let activeBackendKind = "activeBackendKind"
         static let selectedAudioDeviceUID = "selectedAudioDeviceUID"
+        static let lastUserSelectedInputDeviceUID = "lastUserSelectedInputDeviceUID"
         static let customMappingEnabled = "customMappingEnabled"
         static let legacyExclusiveHID = "exclusiveHID"
         static let buttonBindings = "buttonBindings"
@@ -266,6 +267,13 @@ final class AppSettings: ObservableObject {
 
     @Published var selectedAudioDeviceUID: String {
         didSet { defaults.set(selectedAudioDeviceUID, forKey: Keys.selectedAudioDeviceUID) }
+    }
+
+    /// The last physical input chosen by the user, used when the virtual input
+    /// is temporarily unavailable and the app needs a safe fallback.
+    var lastUserSelectedInputDeviceUID: String? {
+        get { defaults.string(forKey: Keys.lastUserSelectedInputDeviceUID) }
+        set { defaults.set(newValue, forKey: Keys.lastUserSelectedInputDeviceUID) }
     }
 
     @Published var customMappingEnabled: Bool {

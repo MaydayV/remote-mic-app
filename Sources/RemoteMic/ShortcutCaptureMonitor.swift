@@ -2,6 +2,64 @@ import AppKit
 import CoreGraphics
 import Foundation
 
+enum StandaloneKeyboardModifier: String, CaseIterable {
+    case leftCommand = "left_command"
+    case rightCommand = "right_command"
+    case leftOption = "left_option"
+    case rightOption = "right_option"
+    case leftControl = "left_control"
+    case rightControl = "right_control"
+    case leftShift = "left_shift"
+    case rightShift = "right_shift"
+    case function
+
+    var keyCode: UInt16 {
+        switch self {
+        case .leftCommand: return 55
+        case .rightCommand: return 54
+        case .leftOption: return 58
+        case .rightOption: return 61
+        case .leftControl: return 59
+        case .rightControl: return 62
+        case .leftShift: return 56
+        case .rightShift: return 60
+        case .function: return 63
+        }
+    }
+
+    var modifierFlags: NSEvent.ModifierFlags {
+        switch self {
+        case .leftCommand, .rightCommand: return .command
+        case .leftOption, .rightOption: return .option
+        case .leftControl, .rightControl: return .control
+        case .leftShift, .rightShift: return .shift
+        case .function: return .function
+        }
+    }
+
+    var shortcut: CustomKeyboardShortcut {
+        CustomKeyboardShortcut(
+            keyCode: keyCode,
+            modifierFlags: modifierFlags,
+            keyLabel: keyLabel
+        )
+    }
+
+    private var keyLabel: String {
+        switch self {
+        case .leftCommand: return "Left Command"
+        case .rightCommand: return "Right Command"
+        case .leftOption: return "Left Option"
+        case .rightOption: return "Right Option"
+        case .leftControl: return "Left Control"
+        case .rightControl: return "Right Control"
+        case .leftShift: return "Left Shift"
+        case .rightShift: return "Right Shift"
+        case .function: return "Fn"
+        }
+    }
+}
+
 private func shortcutCaptureEventTapCallback(
     proxy: CGEventTapProxy,
     type: CGEventType,
@@ -24,6 +82,8 @@ enum ShortcutCaptureStartFailure: Error, Equatable {
 
 final class ShortcutCaptureMonitor {
     typealias CallbackDispatcher = (@escaping () -> Void) -> Void
+    static let captureEventMask = CGEventMask(1 << CGEventType.keyDown.rawValue) |
+        CGEventMask(1 << CGEventType.flagsChanged.rawValue)
 
     private let onCapture: (CustomKeyboardShortcut) -> Void
     private let accessibilityTrusted: () -> Bool
@@ -32,6 +92,9 @@ final class ShortcutCaptureMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var didCapture = false
+    private var pressedModifierKeyCodes: Set<UInt16> = []
+    private var standaloneModifierCandidate: StandaloneKeyboardModifier?
+    private var modifierChordDetected = false
 
     init(
         onCapture: @escaping (CustomKeyboardShortcut) -> Void,
@@ -53,15 +116,17 @@ final class ShortcutCaptureMonitor {
 
         lock.lock()
         didCapture = false
+        pressedModifierKeyCodes.removeAll()
+        standaloneModifierCandidate = nil
+        modifierChordDetected = false
         lock.unlock()
 
         let context = Unmanaged.passUnretained(self).toOpaque()
-        let eventMask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         guard let eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
-            eventsOfInterest: eventMask,
+            eventsOfInterest: Self.captureEventMask,
             callback: shortcutCaptureEventTapCallback,
             userInfo: context
         ) else {
@@ -91,6 +156,11 @@ final class ShortcutCaptureMonitor {
         }
         runLoopSource = nil
         eventTap = nil
+        lock.lock()
+        pressedModifierKeyCodes.removeAll()
+        standaloneModifierCandidate = nil
+        modifierChordDetected = false
+        lock.unlock()
     }
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -100,9 +170,13 @@ final class ShortcutCaptureMonitor {
             }
             return false
         }
-        guard type == .keyDown else { return false }
+        guard type == .keyDown || type == .flagsChanged else { return false }
         guard event.getIntegerValueField(.eventSourceUserData) != KeyboardInjector.syntheticEventMarker else {
             return false
+        }
+
+        if type == .flagsChanged {
+            return handleModifierFlagsChanged(event)
         }
 
         lock.lock()
@@ -119,6 +193,9 @@ final class ShortcutCaptureMonitor {
             return false
         }
         didCapture = true
+        pressedModifierKeyCodes.removeAll()
+        standaloneModifierCandidate = nil
+        modifierChordDetected = false
         lock.unlock()
 
         let shortcut = CustomKeyboardShortcut(event: nsEvent)
@@ -126,6 +203,53 @@ final class ShortcutCaptureMonitor {
         dispatchCallback {
             capture(shortcut)
         }
+        return true
+    }
+
+    private func handleModifierFlagsChanged(_ event: CGEvent) -> Bool {
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        guard let modifier = StandaloneKeyboardModifier.allCases.first(where: {
+            $0.keyCode == keyCode
+        }) else {
+            return false
+        }
+
+        lock.lock()
+        if didCapture {
+            lock.unlock()
+            return true
+        }
+
+        if pressedModifierKeyCodes.contains(keyCode) {
+            pressedModifierKeyCodes.remove(keyCode)
+            let shouldCapture = pressedModifierKeyCodes.isEmpty &&
+                !modifierChordDetected &&
+                standaloneModifierCandidate == modifier
+            if pressedModifierKeyCodes.isEmpty {
+                standaloneModifierCandidate = nil
+                modifierChordDetected = false
+            }
+            if shouldCapture {
+                didCapture = true
+            }
+            lock.unlock()
+
+            if shouldCapture {
+                let capture = onCapture
+                let shortcut = modifier.shortcut
+                dispatchCallback { capture(shortcut) }
+            }
+            return true
+        }
+
+        pressedModifierKeyCodes.insert(keyCode)
+        if pressedModifierKeyCodes.count == 1 && !modifierChordDetected {
+            standaloneModifierCandidate = modifier
+        } else {
+            standaloneModifierCandidate = nil
+            modifierChordDetected = true
+        }
+        lock.unlock()
         return true
     }
 
