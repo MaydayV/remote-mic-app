@@ -58,6 +58,15 @@ struct BluetoothLifecycleTests {
         ) == nil)
     }
 
+    @Test func missingHIDServicePreservesFnTapPreferenceDuringRecovery() {
+        #expect(HIDMappingRecoveryPolicy.shouldPreserveFnTapPreferenceAfterMappingFailure(
+            hasMatchingServices: false
+        ))
+        #expect(!HIDMappingRecoveryPolicy.shouldPreserveFnTapPreferenceAfterMappingFailure(
+            hasMatchingServices: true
+        ))
+    }
+
     @Test func initializationCapabilitiesAndReadyAreDistinct() {
         #expect(BluetoothLifecyclePhase.discovering(1)
             .acceptsInitializationCallback(generation: 1))

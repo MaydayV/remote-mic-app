@@ -44,6 +44,39 @@ struct VirtualAudioConnectionLifecycleTests {
         ))
     }
 
+    @Test func onDemandModeReleasesIdleConnectedAudioButKeepsActiveVoiceReady() {
+        #expect(!VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 1,
+            testToneActive: false,
+            keepAliveWhileConnected: false
+        ))
+        #expect(!VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 0,
+            siriRemoteReady: true,
+            testToneActive: false,
+            keepAliveWhileConnected: false
+        ))
+        #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 1,
+            bluetoothVoiceActive: true,
+            testToneActive: false,
+            keepAliveWhileConnected: false
+        ))
+        #expect(VirtualAudioConnectionLifecyclePolicy.shouldBeActive(
+            readyBluetoothBridgeCount: 0,
+            siriRemoteVoiceActive: true,
+            testToneActive: false,
+            keepAliveWhileConnected: false
+        ))
+    }
+
+    @Test func bridgeDefaultsToOnDemandVirtualAudioAndAllowsExplicitKeepAlive() {
+        #expect(!BridgeAppModel(virtualAudioKeepAliveEnabled: false).isVirtualAudioKeepAliveEnabled)
+        #expect(BridgeAppModel(virtualAudioKeepAliveEnabled: true).isVirtualAudioKeepAliveEnabled)
+        #expect(BridgeAppModel.onDemandVirtualAudioReleaseDelay >= 1)
+        #expect(BridgeAppModel.onDemandVirtualAudioReleaseDelay <= 5)
+    }
+
     @Test func remoteAudioSampleRatePolicySwitchesInBothDirections() {
         #expect(RemoteAudioFormat.needsReconfiguration(
             current: RemoteAudioFormat.xiaomiSampleRate,

@@ -83,7 +83,16 @@ for locale in zh-Hans en; do
   temporary="$(/usr/bin/mktemp "/private/tmp/remotemic-auto-history.XXXXXX")"
   commit_subject="$(git log -1 --format=%s)"
   if [[ "$locale" == "zh-Hans" ]]; then
-    if [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
+    if [[ "$commit_subject" == *"on-demand audio"* && "$commit_subject" == *"back-only"* ]]; then
+      first_note="新增实体遥控器虚拟声卡按需占用，空闲时自动释放，避免正常播放音量被压低。"
+      second_note="修复关闭自定义映射时实体遥控器返回键不可用的问题，并在 HID 服务延迟出现时保留用户的 Fn 点按偏好。"
+    elif [[ "$commit_subject" == *"on-demand audio"* ]]; then
+      first_note="新增实体遥控器虚拟声卡按需占用，空闲时自动释放，避免正常播放音量被压低。"
+      second_note="语音或测试音开始前会即时恢复输出，停止后排空音频再安全释放资源。"
+    elif [[ "$commit_subject" == *"back-only"* ]]; then
+      first_note="修复关闭自定义映射时实体遥控器返回键不可用的问题。"
+      second_note="识别到已配对的实体遥控器后，仅监听返回键并发送一次退格，不接管其它系统按键。"
+    elif [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
       first_note="新增单个按键、组合键和单独修饰键的快捷键录入，并记住用户最后选择的实体输入设备。"
       second_note="虚拟麦克风暂时不可用时，优先恢复用户选择的实体输入设备；快捷键录入不会触发原有系统动作。"
     elif [[ "$commit_subject" == *"shortcut modifiers"* ]]; then
@@ -109,7 +118,16 @@ for locale in zh-Hans en; do
       second_note="优化更新流程与界面体验。"
     fi
   else
-    if [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
+    if [[ "$commit_subject" == *"on-demand audio"* && "$commit_subject" == *"back-only"* ]]; then
+      first_note="Added on-demand virtual-audio allocation for physical remotes so idle connections no longer duck normal system playback."
+      second_note="Fixed the default back button with custom mapping disabled and preserved the user's Fn-tap preference while HID discovery is pending."
+    elif [[ "$commit_subject" == *"on-demand audio"* ]]; then
+      first_note="Added on-demand virtual-audio allocation for physical remotes so idle connections no longer duck normal system playback."
+      second_note="Voice and test-tone paths restore the output immediately, then drain pending audio before releasing resources."
+    elif [[ "$commit_subject" == *"back-only"* ]]; then
+      first_note="Fixed the physical remote back button when custom mapping is disabled."
+      second_note="Paired physical remotes now use a back-only listener that emits one backspace without taking over other system keys."
+    elif [[ "$commit_subject" == *"shortcut modifiers"* && "$commit_subject" == *"input fallback"* ]]; then
       first_note="Added recording for single keys, key combinations, and standalone modifiers, plus remembered physical input fallback."
       second_note="The app prioritizes the user's last physical input when the virtual microphone is temporarily unavailable and safely suppresses the recorded keystroke."
     elif [[ "$commit_subject" == *"shortcut modifiers"* ]]; then

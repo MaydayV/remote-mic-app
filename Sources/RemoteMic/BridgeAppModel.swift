@@ -35,6 +35,15 @@ enum HIDMappingRecoveryPolicy {
               retryDelays.indices.contains(attempt) else { return nil }
         return retryDelays[attempt]
     }
+
+    /// A missing HID service is usually a discovery timing issue (for example
+    /// after wake), not a failed mapping write. Keep the user's Fn-tap choice
+    /// while the bounded recovery loop waits for macOS to expose the service.
+    static func shouldPreserveFnTapPreferenceAfterMappingFailure(
+        hasMatchingServices: Bool
+    ) -> Bool {
+        !hasMatchingServices
+    }
 }
 
 /// The onboarding view only needs to know that audio has arrived once per voice session.
@@ -165,6 +174,10 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private var audioRecoveryGeneration: UInt64 = 0
     private var virtualAudioReleaseGeneration: UInt64 = 0
     private var pendingVirtualAudioRelease: (generation: UInt64, reason: String)?
+    private let virtualAudioKeepAliveEnabled: Bool
+    private var onDemandVirtualAudioReleaseWorkItem: DispatchWorkItem?
+    private var onDemandVirtualAudioReleaseGeneration: UInt64 = 0
+    static let onDemandVirtualAudioReleaseDelay: TimeInterval = 2.0
     private var systemAudioSuspensionState = SystemAudioSuspensionState()
     private var managedDefaultInputTransition: ManagedDefaultInputTransition?
     private lazy var audioHardwareListener: AudioObjectPropertyListenerBlock = { [weak self] count, addresses in
@@ -172,11 +185,19 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         self?.scheduleAudioRecovery(reason: "hardware_change", details: "properties=\(properties)")
     }
 
+    var isVirtualAudioKeepAliveEnabled: Bool {
+        virtualAudioKeepAliveEnabled
+    }
+
     init(
         settings: AppSettings = AppSettings(),
-        initialAudioDevices: [AudioDeviceInfo] = []
+        initialAudioDevices: [AudioDeviceInfo] = [],
+        virtualAudioKeepAliveEnabled: Bool =
+            ProcessInfo.processInfo.arguments.contains("--virtual-audio-keep-alive") ||
+            UserDefaults.standard.bool(forKey: "VirtualAudioKeepAliveEnabled")
     ) {
         self.settings = settings
+        self.virtualAudioKeepAliveEnabled = virtualAudioKeepAliveEnabled
         activeBackendKind = RemoteBackendKind(rawValue: settings.activeBackendKindRawValue)
             ?? .xiaomi
         audioDevices = initialAudioDevices
@@ -227,6 +248,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         audioRecoveryGeneration &+= 1
         audioRecoveryWorkItem?.cancel()
         audioRecoveryWorkItem = nil
+        cancelScheduledOnDemandVirtualAudioRelease(trigger: "app_stop")
         stopObservingAudioHardware()
         cancelTestToneIfNeeded(
             statusMessage: LocalizedMessage("app.status.stopped"),
@@ -403,6 +425,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                             "state={\(outputState)}"
                     )
                     self.releaseVirtualAudioOutputIfUnused(reason: "startup_system_suspended")
+                } else if !self.virtualAudioKeepAliveEnabled {
+                    AppLogger.shared.write(
+                        "AUDIO ON_DEMAND startup_release state={\(outputState)}"
+                    )
+                    self.releaseVirtualAudioOutputIfUnused(reason: "startup_on_demand_idle")
                 }
                 self.startBluetoothConnections()
                 AppLogger.shared.write(
@@ -489,6 +516,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     @discardableResult
     private func ensureVirtualAudioOutputReady(reason: String) -> Bool {
+        cancelScheduledOnDemandVirtualAudioRelease(trigger: "ensure_\(reason)")
         isAudioOutputReady = audioOutput.isReadyForTestTone
         guard !isAudioOutputReady else { return true }
         AppLogger.shared.write(
@@ -759,6 +787,16 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             powerKeySuppressed = applyVoiceFunctionMapping(neutralizeVoiceKey: true)
             if voiceFunctionMapper.isVoiceKeyNeutralized {
                 voiceFnTapSession.setEnabled(true)
+            } else if HIDMappingRecoveryPolicy.shouldPreserveFnTapPreferenceAfterMappingFailure(
+                hasMatchingServices: voiceFunctionMapper.hasMatchingServices
+            ) {
+                voiceFnTapSession.setEnabled(false)
+                AppLogger.shared.write(
+                    "VOICE FN TAP mode_pending_mapping reason=no_matching_service"
+                )
+                scheduleHIDMappingRecoveryIfNeeded()
+                powerKeySuppressed = !settings.customMappingEnabled ||
+                    voiceFunctionMapper.isPowerKeySuppressed
             } else if canFallbackVoiceKeyMode {
                 settings.voiceFnTapModeEnabled = false
                 voiceFnTapSession.setEnabled(false)
@@ -859,15 +897,17 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func startHIDMonitors(powerKeySuppressed: Bool) {
         stopHIDMonitors()
+        let backOnlyMode = !settings.customMappingEnabled &&
+            settings.remoteDeviceProfiles.contains { $0.hidFingerprint != nil }
         hidPowerKeySuppressed = powerKeySuppressed
         hidAllowedLocationIDs = settings.customMappingEnabled
             ? voiceFunctionMapper.powerSuppressedLocationIDs
             : nil
-        guard settings.customMappingEnabled else {
+        guard settings.customMappingEnabled || backOnlyMode else {
             hidStatus = LocalizedMessage("button_mapping.status.system_managed")
             return
         }
-        _ = hidEventSuppressor.start()
+        if settings.customMappingEnabled { _ = hidEventSuppressor.start() }
         for profile in settings.remoteDeviceProfiles {
             guard let fingerprint = profile.hidFingerprint else { continue }
             let monitor = makeHIDMonitor(
@@ -877,10 +917,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             hidMonitors[fingerprint] = monitor
             monitor.start(
                 powerKeySuppressed: powerKeySuppressed,
-                allowedLocationIDs: hidAllowedLocationIDs
+                allowedLocationIDs: hidAllowedLocationIDs,
+                allowBackOnly: backOnlyMode
             )
         }
-        startHIDDiscoveryIfNeeded()
+        startHIDDiscoveryIfNeeded(allowBackOnly: backOnlyMode)
     }
 
     private func stopHIDMonitors() {
@@ -892,8 +933,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         activeRemoteButtons = []
     }
 
-    private func startHIDDiscoveryIfNeeded() {
-        guard settings.customMappingEnabled, discoveryHIDMonitor == nil else { return }
+    private func startHIDDiscoveryIfNeeded(allowBackOnly: Bool = false) {
+        guard (settings.customMappingEnabled || allowBackOnly), discoveryHIDMonitor == nil else { return }
         let monitor = makeHIDMonitor(
             profileID: nil,
             targetFingerprint: nil,
@@ -905,7 +946,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         discoveryHIDMonitor = monitor
         monitor.start(
             powerKeySuppressed: hidPowerKeySuppressed,
-            allowedLocationIDs: hidAllowedLocationIDs
+            allowedLocationIDs: hidAllowedLocationIDs,
+            allowBackOnly: allowBackOnly
         )
     }
 
@@ -1204,6 +1246,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func startSiriRemoteVoice() {
         guard activeBackendKind == .siriRemote, !siriRemoteVoiceActive else { return }
+        cancelScheduledOnDemandVirtualAudioRelease(trigger: "siri_voice_start")
         guard isAudioOutputReady || configureVirtualAudioOutput(reason: "siri_voice_start") else {
             MainActor.assumeIsolated {
                 siriRemoteBackend.stopMicrophone()
@@ -1245,7 +1288,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         updateVoiceKeyState(streaming: false)
         _ = voiceFnTapSession.stopVoice()
         endVoiceSessionIfNeeded(flushAudio: false)
-        releaseVirtualAudioOutputIfUnused(reason: "siri_voice_\(reason)")
+        if !shouldKeepVirtualAudioActive {
+            scheduleOnDemandVirtualAudioRelease(reason: "siri_voice_\(reason)")
+        } else {
+            releaseVirtualAudioOutputIfUnused(reason: "siri_voice_\(reason)")
+        }
         AppLogger.shared.write(
             "SIRI REMOTE voice stopped reason=\(reason) samples=\(currentVoiceSampleCount)"
         )
@@ -1255,8 +1302,13 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         isSiriRemoteConnected = connected
         if connected, activeBackendKind == .siriRemote {
             voiceFnTapSession.resume()
-            if !isAudioOutputReady {
-                _ = configureVirtualAudioOutput(reason: "siri_remote_ready")
+            if shouldKeepVirtualAudioActive {
+                cancelScheduledOnDemandVirtualAudioRelease(trigger: "siri_remote_ready")
+                _ = ensureVirtualAudioOutputReady(reason: "siri_remote_ready")
+            } else if !isAudioOutputReady {
+                AppLogger.shared.write(
+                    "AUDIO REBIND deferred reason=siri_remote_ready on_demand_idle=true"
+                )
             }
             return
         }
@@ -1505,6 +1557,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         activeBluetoothVoiceTraceID = nil
         bluetoothVoiceTraceStartedAt = nil
         endVoiceSessionIfNeeded(flushAudio: shouldFlushAudio)
+        if systemAudioSuspensionState.isSuspended {
+            releaseVirtualAudioOutputIfUnused(reason: "system_suspended_after_bluetooth_voice")
+        } else if !shouldKeepVirtualAudioActive {
+            scheduleOnDemandVirtualAudioRelease(reason: "bluetooth_voice_stopped")
+        }
     }
 
     func bluetoothBridge(_ bridge: XiaomiBluetoothBridge, didDecode samples: [Int16]) {
@@ -1886,12 +1943,52 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             siriRemoteVoiceActive: siriRemoteVoiceActive,
             bluetoothVoiceActive: bluetoothVoiceActive,
             testToneActive: isPlayingTestTone,
-            systemSuspended: systemAudioSuspensionState.isSuspended
+            systemSuspended: systemAudioSuspensionState.isSuspended,
+            keepAliveWhileConnected: virtualAudioKeepAliveEnabled
         )
     }
 
     private var hasActiveVirtualAudioSource: Bool {
         bluetoothVoiceActive || isPlayingTestTone || siriRemoteVoiceActive
+    }
+
+    private func scheduleOnDemandVirtualAudioRelease(reason: String) {
+        guard !virtualAudioKeepAliveEnabled else { return }
+        cancelScheduledOnDemandVirtualAudioRelease(trigger: "reschedule_\(reason)")
+        onDemandVirtualAudioReleaseGeneration &+= 1
+        let generation = onDemandVirtualAudioReleaseGeneration
+        let work = DispatchWorkItem { [weak self] in
+            guard let self,
+                  self.started,
+                  self.onDemandVirtualAudioReleaseGeneration == generation
+            else { return }
+            self.onDemandVirtualAudioReleaseWorkItem = nil
+            AppLogger.shared.write(
+                "AUDIO ON_DEMAND release_due reason=\(reason) generation=\(generation) " +
+                    "state={\(self.audioOutput.diagnosticState())}"
+            )
+            self.releaseVirtualAudioOutputIfUnused(reason: reason)
+        }
+        onDemandVirtualAudioReleaseWorkItem = work
+        AppLogger.shared.write(
+            "AUDIO ON_DEMAND release_scheduled reason=\(reason) generation=\(generation) " +
+                "delay_s=\(Self.onDemandVirtualAudioReleaseDelay)"
+        )
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Self.onDemandVirtualAudioReleaseDelay,
+            execute: work
+        )
+    }
+
+    private func cancelScheduledOnDemandVirtualAudioRelease(trigger: String) {
+        guard onDemandVirtualAudioReleaseWorkItem != nil else { return }
+        onDemandVirtualAudioReleaseGeneration &+= 1
+        onDemandVirtualAudioReleaseWorkItem?.cancel()
+        onDemandVirtualAudioReleaseWorkItem = nil
+        AppLogger.shared.write(
+            "AUDIO ON_DEMAND release_cancelled trigger=\(trigger) " +
+                "generation=\(onDemandVirtualAudioReleaseGeneration)"
+        )
     }
 
     private func resumeVirtualAudioOutputIfNeeded(reason: String) {
@@ -1974,6 +2071,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     }
 
     private func releaseVirtualAudioOutputIfUnused(reason: String) {
+        cancelScheduledOnDemandVirtualAudioRelease(trigger: "release_\(reason)")
         guard !shouldKeepVirtualAudioActive else {
             AppLogger.shared.write(
                 "AUDIO RELEASE skipped reason=\(reason) still_required=true " +

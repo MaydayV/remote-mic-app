@@ -46,6 +46,40 @@ struct RemoteButtonsTests {
         #expect(VoiceKeyMode.leftCommand.requiresAccessibility)
     }
 
+    @Test func backOnlyModeEmitsDeleteBackwardWhenCustomMappingIsDisabled() throws {
+        let suiteName = "RemoteButtonsTests.backOnly.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: defaults)
+        settings.customMappingEnabled = false
+        let profileID = try #require(settings.selectedRemoteProfileID)
+        var actions: [(RemoteButton, ButtonTrigger, ConfiguredButtonAction)] = []
+        let monitor = HIDRemoteMonitor(
+            settings: settings,
+            profileID: profileID,
+            ownsEventSuppressor: false,
+            runtimePermissions: { true },
+            actionPerformer: { button, trigger, action in
+                actions.append((button, trigger, action))
+                return true
+            }
+        )
+        monitor.connectSimulatedDevice(fingerprint: "back-only", profileID: profileID)
+        let report = Data([UInt8(RemoteButton.back.hidUsage), 0, 0, 0, 0, 0])
+        monitor.handleSimulatedBackOnlyReport(reportID: 1, data: report)
+        monitor.handleSimulatedBackOnlyReport(reportID: 1, data: Data(repeating: 0, count: 6))
+        monitor.handleSimulatedBackOnlyReport(
+            reportID: 1,
+            data: Data([UInt8(RemoteButton.ok.hidUsage), 0, 0, 0, 0, 0])
+        )
+
+        #expect(actions.count == 1)
+        #expect(actions.first?.0 == .back)
+        #expect(actions.first?.1 == .singleClick)
+        #expect(actions.first?.2.action == .deleteBackward)
+        monitor.stop()
+    }
+
     @Test func voiceKeyModesPostMatchingModifierFlags() {
         var posted: [(CGKeyCode, Bool, CGEventFlags)] = []
         let poster: KeyboardInjector.KeyStatePoster = { code, pressed, flags in
