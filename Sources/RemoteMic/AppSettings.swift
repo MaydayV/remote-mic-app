@@ -10,6 +10,7 @@ private struct PersonalizedConfiguration: Codable {
     let formatVersion: Int
     let gainDB: Double
     let selectedAudioDeviceUID: String
+    let karaokeOutputDeviceUID: String?
     let customMappingEnabled: Bool
     let buttonBindings: [String: ButtonAction]
     let buttonShortcuts: [String: CustomKeyboardShortcut]
@@ -93,6 +94,31 @@ struct VoiceSessionUsageRecord: Codable, Equatable, Identifiable {
     let endedAt: Date
     let duration: TimeInterval
     let source: UsageEventSource?
+    let applicationName: String?
+
+    init(id: UUID, startedAt: Date?, endedAt: Date, duration: TimeInterval,
+         source: UsageEventSource?, applicationName: String? = nil) {
+        self.id = id
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.duration = duration
+        self.source = source
+        self.applicationName = applicationName
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, startedAt, endedAt, duration, source, applicationName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
+        endedAt = try container.decode(Date.self, forKey: .endedAt)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        source = try container.decodeIfPresent(UsageEventSource.self, forKey: .source)
+        applicationName = try container.decodeIfPresent(String.self, forKey: .applicationName)
+    }
 }
 
 private struct DailyUsageMetadata: Codable {
@@ -226,6 +252,7 @@ final class AppSettings: ObservableObject {
         static let gainDB = "gainDB"
         static let activeBackendKind = "activeBackendKind"
         static let selectedAudioDeviceUID = "selectedAudioDeviceUID"
+        static let karaokeOutputDeviceUID = "karaokeOutputDeviceUID"
         static let lastUserSelectedInputDeviceUID = "lastUserSelectedInputDeviceUID"
         static let customMappingEnabled = "customMappingEnabled"
         static let legacyExclusiveHID = "exclusiveHID"
@@ -267,6 +294,10 @@ final class AppSettings: ObservableObject {
 
     @Published var selectedAudioDeviceUID: String {
         didSet { defaults.set(selectedAudioDeviceUID, forKey: Keys.selectedAudioDeviceUID) }
+    }
+
+    @Published var karaokeOutputDeviceUID: String {
+        didSet { defaults.set(karaokeOutputDeviceUID, forKey: Keys.karaokeOutputDeviceUID) }
     }
 
     /// The last physical input chosen by the user, used when the virtual input
@@ -436,6 +467,7 @@ final class AppSettings: ObservableObject {
             ? 10.0
             : defaults.double(forKey: Keys.gainDB)
         selectedAudioDeviceUID = defaults.string(forKey: Keys.selectedAudioDeviceUID) ?? ""
+        karaokeOutputDeviceUID = defaults.string(forKey: Keys.karaokeOutputDeviceUID) ?? ""
         if defaults.object(forKey: Keys.customMappingEnabled) != nil {
             customMappingEnabled = defaults.bool(forKey: Keys.customMappingEnabled)
         } else {
@@ -1011,6 +1043,7 @@ final class AppSettings: ObservableObject {
         _ duration: TimeInterval,
         startedAt: Date? = nil,
         source: UsageEventSource = .unknown,
+        applicationName: String? = nil,
         at date: Date = Date(),
         calendar: Calendar = .current
     ) {
@@ -1067,7 +1100,8 @@ final class AppSettings: ObservableObject {
                 startedAt: startedAt,
                 endedAt: date,
                 duration: duration,
-                source: source
+                source: source,
+                applicationName: applicationName
             )]
         )
     }
@@ -1226,6 +1260,7 @@ final class AppSettings: ObservableObject {
             formatVersion: 1,
             gainDB: gainDB,
             selectedAudioDeviceUID: selectedAudioDeviceUID,
+            karaokeOutputDeviceUID: karaokeOutputDeviceUID,
             customMappingEnabled: customMappingEnabled,
             buttonBindings: Dictionary(
                 uniqueKeysWithValues: buttonBindings.map { ($0.key.rawValue, $0.value) }
@@ -1300,6 +1335,7 @@ final class AppSettings: ObservableObject {
 
         gainDB = configuration.gainDB
         selectedAudioDeviceUID = configuration.selectedAudioDeviceUID
+        karaokeOutputDeviceUID = configuration.karaokeOutputDeviceUID ?? ""
         customMappingEnabled = configuration.customMappingEnabled
         buttonBindings = Self.defaultBindings.merging(importedBindings) { _, imported in imported }
         buttonShortcuts = importedShortcuts

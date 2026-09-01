@@ -224,6 +224,9 @@
 "audio.action.learn_virtual_microphones" = "获取 BlackHole";
 "audio.action.send_test_tone" = "发送 1 秒测试音";
 "audio.output.privacy_help" = "应用只把遥控器语音写到所选设备。最后一只遥控器断开时，如果系统默认输入正是该虚拟设备，会临时回退到物理麦克风；重连时仅在用户没有手动改选的情况下恢复。系统默认输出不会被修改。";
+"audio.karaoke.title" = "本地监听";
+"audio.karaoke.disabled" = "关闭";
+"audio.karaoke.help" = "可选：在本地设备同步监听遥控器语音，同时保持上方虚拟输出不变。";
 "audio.compatibility.title" = "豆包输入法兼容";
 "audio.compatibility.section_title" = "语音输入与兼容";
 "audio.compatibility.microphone_label" = "兼容虚拟麦克风";
@@ -559,3 +562,8 @@
 "button_mapping.rapid_press" = "允许快速连续按下";
 "button_mapping.rapid_press_hint_short" = "适合快速连续点按；长按可能触发多次操作。";
 "button_mapping.rapid_press_help" = "对这个不可重复动作跳过稳定释放保护。仅在遥控器能产生独立按下事件时启用。";
+"action.mouse_left_click" = "鼠标左键单击";
+"action.mouse_right_click" = "鼠标右键单击";
+"action.mouse_middle_click" = "鼠标中键单击";
+"action.toggle_mouse_mode" = "切换鼠标控制模式";
+"status_item.mouse_mode_accessibility" = "鼠标控制模式已启用";

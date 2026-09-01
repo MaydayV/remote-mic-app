@@ -475,6 +475,10 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
     case customShortcut
     case openCustomApplication
     case toggleLongRecording
+    case mouseLeftClick
+    case mouseRightClick
+    case mouseMiddleClick
+    case toggleMouseMode
     case openRemoteMic
     case openCodex
     case openClaude
@@ -528,6 +532,10 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
         case .customShortcut: return localization.text("action.custom_shortcut")
         case .openCustomApplication: return localization.text("action.open_custom_application")
         case .toggleLongRecording: return localization.text("action.toggle_long_recording")
+        case .mouseLeftClick: return localization.text("action.mouse_left_click")
+        case .mouseRightClick: return localization.text("action.mouse_right_click")
+        case .mouseMiddleClick: return localization.text("action.mouse_middle_click")
+        case .toggleMouseMode: return localization.text("action.toggle_mouse_mode")
         case .openRemoteMic: return localization.text("action.open_remote_mic")
         case .openCodex: return localization.text("action.open_codex")
         case .openClaude: return localization.text("action.open_claude")
@@ -573,9 +581,10 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
              .deleteBackward:
             return .basicKeys
         case .showDesktop, .contextMenu, .appSwitcher, .volumeUp, .volumeDown, .volumeMute,
-             .playPause, .previousCommandLeft, .nextCommandRight, .toggleLongRecording:
+             .playPause, .previousCommandLeft, .nextCommandRight, .toggleLongRecording,
+             .mouseLeftClick, .mouseRightClick, .mouseMiddleClick:
             return .systemAndMedia
-        case .customShortcut, .openCustomApplication:
+        case .customShortcut, .openCustomApplication, .toggleMouseMode:
             return .custom
         case .openRemoteMic, .openCodex, .openClaude, .openCmux, .openWeChat, .openCursor,
              .openXcode, .openSlack, .openWeCom, .openNeteaseMusic, .openChrome, .openSafari,
@@ -607,7 +616,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
     }
 
     var isAppInternal: Bool {
-        self == .toggleLongRecording
+        self == .toggleLongRecording || self == .toggleMouseMode
     }
 
     func isEnabled(experimentalContinuousRecordingEnabled: Bool) -> Bool {

@@ -195,6 +195,24 @@ final class XiaomiBluetoothBridge: NSObject {
         state = .stopped
     }
 
+    /// Suspend the bridge for system sleep without scheduling an automatic
+    /// reconnect. The runtime lifecycle owner will explicitly restart it after
+    /// the wake grace period, preventing closed-lid wake storms.
+    func suspendForSystemSleep() {
+        shouldRun = false
+        reconnectWorkItem?.cancel()
+        reconnectWorkItem = nil
+        reconnectPolicy.reset()
+        central?.stopScan()
+        closeMicrophoneIfNeeded()
+        if let central, let peripheral, peripheral.state != .disconnected {
+            central.cancelPeripheralConnection(peripheral)
+        }
+        finishAttempt(reconnectAfter: nil)
+        state = .stopped
+        AppLogger.shared.write("BLE SYSTEM SUSPEND completed")
+    }
+
     func reconnectNow() {
         guard shouldRun else { return }
         reconnectWorkItem?.cancel()

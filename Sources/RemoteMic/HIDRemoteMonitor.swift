@@ -144,6 +144,7 @@ final class HIDRemoteMonitor {
     var onActiveButtons: ((UUID?, Set<RemoteButton>) -> Void)?
     var onButtonPressed: ((UUID?, String, RemoteButton) -> (profileID: UUID, shouldPerformAction: Bool)?)?
     var onInternalAction: ((UUID?, ButtonAction) -> Void)?
+    var mouseModeEdgeHandler: ((RemoteButton, RemoteEventEdge) -> Bool)?
 
     init(
         settings: AppSettings,
@@ -715,6 +716,10 @@ final class HIDRemoteMonitor {
 
         for usage in pressed.sorted() {
             guard let button = RemoteButton.usageMap[usage] else { continue }
+            if mouseModeEdgeHandler?(button, .down) == true {
+                if !activeDeviceIsSeized { eventSuppressor.arm(button: button, edge: .down) }
+                continue
+            }
             let preflightProfileID = profileID
             let preflightRecognizesDoubleClick = settings.configuredAction(
                 for: button,
@@ -832,6 +837,12 @@ final class HIDRemoteMonitor {
 
         for usage in released {
             let usedNativePassthrough = nativePassthroughUsages.remove(usage) != nil
+            if !usedNativePassthrough,
+               let button = RemoteButton.usageMap[usage],
+               mouseModeEdgeHandler?(button, .up) == true {
+                if !activeDeviceIsSeized { eventSuppressor.arm(button: button, edge: .up) }
+                continue
+            }
             if !activeDeviceIsSeized, !usedNativePassthrough,
                let button = RemoteButton.usageMap[usage] {
                 eventSuppressor.arm(button: button, edge: .up)
@@ -1316,6 +1327,16 @@ final class HIDRemoteMonitor {
         resetGestureRecognition()
         activeUsages.removeAll()
         onActiveButtons?(profileID, [])
+    }
+
+    func flushInFlightInputState() {
+        repeatTimers.values.forEach { $0.cancel() }
+        repeatTimers.removeAll()
+        nonRepeatableReleaseTimers.values.forEach { $0.cancel() }
+        nonRepeatableReleaseTimers.removeAll()
+        nonRepeatablePressedButtons.removeAll()
+        resetGestureRecognition()
+        nativePassthroughUsages.removeAll()
     }
 
     private func runtimePermissionsAreValid() -> Bool {

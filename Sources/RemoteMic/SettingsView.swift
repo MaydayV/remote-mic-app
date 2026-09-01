@@ -600,6 +600,31 @@ struct SettingsView: View {
                     .frame(maxWidth: 270)
                 }
 
+                HStack(spacing: 14) {
+                    Text("audio.karaoke.title")
+                        .frame(width: 92, alignment: .leading)
+                    Picker("", selection: Binding(
+                        get: { settings.karaokeOutputDeviceUID },
+                        set: { value in
+                            settings.karaokeOutputDeviceUID = value
+                            model.applyAudioSettings(reason: "karaoke_output_changed")
+                        }
+                    )) {
+                        Text("audio.karaoke.disabled").tag("")
+                        ForEach(model.audioDevices, id: \.uid) { device in
+                            Text(device.name).tag(device.uid)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 270)
+                }
+
+                Text("audio.karaoke.help")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 106)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 14) {
                         Text("audio.gain.title")
@@ -2022,6 +2047,7 @@ struct SettingsView: View {
         } content: {
             CompatibilityGlassContainer(spacing: 14) {
                 VStack(spacing: 14) {
+                    statisticsProfileSummary
                     statisticsPeriodContent
                     voiceSessionRankingCard
                 }
@@ -2071,6 +2097,14 @@ struct SettingsView: View {
                                 .font(.system(.body, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
 
+                                if let applicationName = record.applicationName,
+                                   !applicationName.isEmpty {
+                                    Text(applicationName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+
                                 Spacer(minLength: 12)
 
                                 Text(voiceSessionDateText(record.endedAt))
@@ -2085,6 +2119,36 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private var statisticsProfileSummary: some View {
+        GlassPanel {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    UsageStatisticCard(
+                        systemImage: "keyboard",
+                        title: localization.text("statistics.metric.button_count"),
+                        value: buttonPressCountText(for: .total),
+                        tint: .blue
+                    )
+                    UsageStatisticCard(
+                        systemImage: "waveform",
+                        title: localization.text("statistics.metric.voice_duration"),
+                        value: voiceDurationText(for: .total),
+                        tint: .orange
+                    )
+                    UsageStatisticCard(
+                        systemImage: "calendar",
+                        title: localization.text("statistics.metric.week_button_count"),
+                        value: localizedNumber(settings.usageStatistics(for: .thisWeek).buttonPressCount),
+                        tint: .green
+                    )
+                }
+                Text("statistics.calendar.title")
+                    .font(.headline)
+                ProfileActivityHeatmap(days: settings.dailyUsageStatistics(days: 180))
             }
         }
     }
@@ -3233,6 +3297,28 @@ private struct UsageStatisticCard: View {
             tint: tint.opacity(0.08),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
+    }
+}
+
+private struct ProfileActivityHeatmap: View {
+    let days: [UsageStatisticsBucket]
+
+    private var maximum: UInt64 {
+        max(1, days.map { $0.statistics.buttonPressCount }.max() ?? 1)
+    }
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 30), spacing: 3) {
+            ForEach(days) { day in
+                let ratio = Double(day.statistics.buttonPressCount) / Double(maximum)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor.opacity(day.statistics.buttonPressCount == 0 ? 0.08 : 0.2 + 0.75 * ratio))
+                    .frame(height: 9)
+                    .help("\(day.statistics.buttonPressCount)")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Recent activity")
     }
 }
 

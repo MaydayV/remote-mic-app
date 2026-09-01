@@ -224,6 +224,9 @@
 "audio.action.learn_virtual_microphones" = "Get BlackHole";
 "audio.action.send_test_tone" = "Play Test Sound";
 "audio.output.privacy_help" = "The app writes remote voice only to the selected device. When the last remote disconnects, a matching system default input temporarily falls back to a physical microphone and is restored on reconnect only if you have not changed it. The system default output is never changed.";
+"audio.karaoke.title" = "Local monitor";
+"audio.karaoke.disabled" = "Off";
+"audio.karaoke.help" = "Optionally mirror remote voice locally while keeping the selected virtual output unchanged.";
 "audio.compatibility.title" = "Doubao Input Compatibility";
 "audio.compatibility.section_title" = "Voice Input & Compatibility";
 "audio.compatibility.microphone_label" = "Compatible virtual microphone";
@@ -559,3 +562,8 @@
 "button_mapping.rapid_press" = "Allow rapid repeated presses";
 "button_mapping.rapid_press_hint_short" = "Useful for quick repeated taps. Holding may trigger multiple actions.";
 "button_mapping.rapid_press_help" = "Bypasses the stable-release guard for this non-repeatable action. Use only when the remote produces distinct press events.";
+"action.mouse_left_click" = "Mouse Left Click";
+"action.mouse_right_click" = "Mouse Right Click";
+"action.mouse_middle_click" = "Mouse Middle Click";
+"action.toggle_mouse_mode" = "Toggle Mouse Control Mode";
+"status_item.mouse_mode_accessibility" = "Mouse control mode is active";
