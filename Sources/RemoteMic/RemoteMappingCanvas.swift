@@ -19,6 +19,9 @@ enum RemoteMappingLayout {
     static let canvasHeight: CGFloat = 570
     static let remoteSize = CGSize(width: 202, height: 410)
     static let arrowCardGap: CGFloat = 7
+    /// Siri Remote 的原图带有很宽的透明边距；横向放大后，遥控器本体
+    /// 与 RC003 在画布上的视觉尺寸一致，同时保留纵向按键比例。
+    static let siriRemoteHorizontalScale: CGFloat = 2.1
 
     static let buttonPlacements: [RemoteMappingPlacement] = [
         RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.386, y: 0.099), targetY: 0.08),
@@ -37,31 +40,38 @@ enum RemoteMappingLayout {
 
     static let appleButtonPlacements: [RemoteMappingPlacement] = [
         // Siri Remote 图片是正方形素材，按遥控器实际按钮中心换算到画布坐标。
-        RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.63, y: 0.128), targetY: 0.08),
-        RemoteMappingPlacement(button: .up, side: .left, anchor: UnitPoint(x: 0.50, y: 0.175), targetY: 0.21),
-        RemoteMappingPlacement(button: .left, side: .left, anchor: UnitPoint(x: 0.32, y: 0.259), targetY: 0.34),
-        RemoteMappingPlacement(button: .back, side: .left, anchor: UnitPoint(x: 0.41, y: 0.400), targetY: 0.47),
-        RemoteMappingPlacement(button: .playPause, side: .left, anchor: UnitPoint(x: 0.41, y: 0.493), targetY: 0.60),
-        RemoteMappingPlacement(button: .mute, side: .left, anchor: UnitPoint(x: 0.41, y: 0.584), targetY: 0.73),
-        RemoteMappingPlacement(button: .right, side: .right, anchor: UnitPoint(x: 0.73, y: 0.259), targetY: 0.19),
-        RemoteMappingPlacement(button: .ok, side: .right, anchor: UnitPoint(x: 0.50, y: 0.259), targetY: 0.31),
-        RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.50, y: 0.347), targetY: 0.43),
-        RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.59, y: 0.400), targetY: 0.55),
-        RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.59, y: 0.493), targetY: 0.67),
-        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.59, y: 0.584), targetY: 0.79),
+        // 左侧只有 6 张卡片，因此使用更宽的垂直间距；右侧还包含固定的语音卡片。
+        RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.63, y: 0.128), targetY: 0.09),
+        RemoteMappingPlacement(button: .up, side: .left, anchor: UnitPoint(x: 0.50, y: 0.175), targetY: 0.252),
+        RemoteMappingPlacement(button: .left, side: .left, anchor: UnitPoint(x: 0.32, y: 0.259), targetY: 0.414),
+        RemoteMappingPlacement(button: .back, side: .left, anchor: UnitPoint(x: 0.41, y: 0.400), targetY: 0.576),
+        RemoteMappingPlacement(button: .playPause, side: .left, anchor: UnitPoint(x: 0.41, y: 0.493), targetY: 0.738),
+        RemoteMappingPlacement(button: .mute, side: .left, anchor: UnitPoint(x: 0.41, y: 0.584), targetY: 0.90),
+        RemoteMappingPlacement(button: .right, side: .right, anchor: UnitPoint(x: 0.73, y: 0.259), targetY: 0.2125),
+        RemoteMappingPlacement(button: .ok, side: .right, anchor: UnitPoint(x: 0.50, y: 0.259), targetY: 0.35),
+        RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.50, y: 0.347), targetY: 0.4875),
+        RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.59, y: 0.400), targetY: 0.625),
+        RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.59, y: 0.493), targetY: 0.7625),
+        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.59, y: 0.584), targetY: 0.90),
     ]
 
     static let voiceAnchor = UnitPoint(x: 0.630, y: 0.099)
     static let appleVoiceAnchor = UnitPoint(x: 0.50, y: 0.128)
-    static let voiceTargetY: CGFloat = 0.07
+    // 与右侧 6 张实体按键卡片共同铺满画布，避免底部留下大块空白。
+    static let voiceTargetY: CGFloat = 0.075
 
-    static func remotePoint(for anchor: UnitPoint, canvasWidth: CGFloat) -> CGPoint {
+    static func remotePoint(
+        for anchor: UnitPoint,
+        canvasWidth: CGFloat,
+        horizontalScale: CGFloat = 1
+    ) -> CGPoint {
         let remoteOrigin = CGPoint(
             x: canvasWidth / 2 - remoteSize.width / 2,
             y: (canvasHeight - remoteSize.height) / 2
         )
+        let renderedX = 0.5 + (anchor.x - 0.5) * horizontalScale
         return CGPoint(
-            x: remoteOrigin.x + remoteSize.width * anchor.x,
+            x: remoteOrigin.x + remoteSize.width * renderedX,
             y: remoteOrigin.y + remoteSize.height * anchor.y
         )
     }
@@ -165,7 +175,10 @@ struct RemoteMappingCanvas: View {
             for placement in visiblePlacements {
                 drawConnection(
                     context: &context,
-                    start: metrics.remotePoint(for: placement.anchor),
+                    start: metrics.remotePoint(
+                        for: placement.anchor,
+                        usesSiriRemotePhoto: usesSiriRemotePhoto
+                    ),
                     end: metrics.cardEdgePoint(side: placement.side, targetY: placement.targetY),
                     side: placement.side,
                     selected: selectedButton == placement.button,
@@ -177,7 +190,8 @@ struct RemoteMappingCanvas: View {
                 start: metrics.remotePoint(
                     for: usesSiriRemotePhoto
                         ? RemoteMappingLayout.appleVoiceAnchor
-                        : RemoteMappingLayout.voiceAnchor
+                        : RemoteMappingLayout.voiceAnchor,
+                    usesSiriRemotePhoto: usesSiriRemotePhoto
                 ),
                 end: metrics.cardEdgePoint(side: .right, targetY: RemoteMappingLayout.voiceTargetY),
                 side: .right,
@@ -379,10 +393,16 @@ struct RemoteMappingCanvas: View {
             )
         }
 
-        func remotePoint(for anchor: UnitPoint) -> CGPoint {
+        func remotePoint(
+            for anchor: UnitPoint,
+            usesSiriRemotePhoto: Bool
+        ) -> CGPoint {
             RemoteMappingLayout.remotePoint(
                 for: anchor,
-                canvasWidth: width
+                canvasWidth: width,
+                horizontalScale: usesSiriRemotePhoto
+                    ? RemoteMappingLayout.siriRemoteHorizontalScale
+                    : 1
             )
         }
     }
@@ -417,6 +437,7 @@ private struct MappingRemotePhoto: View {
                 Image(nsImage: photo)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .scaleEffect(x: RemoteMappingLayout.siriRemoteHorizontalScale, y: 1)
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.quaternary)

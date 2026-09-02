@@ -3502,7 +3502,9 @@ private struct SiriRemotePhoto: View {
             if let photo = SiriRemoteImageResource.image {
                 Image(nsImage: photo)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .aspectRatio(contentMode: .fill)
+                    .scaleEffect(x: RemoteMappingLayout.siriRemoteHorizontalScale, y: 1)
+                    .clipped()
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.quaternary)

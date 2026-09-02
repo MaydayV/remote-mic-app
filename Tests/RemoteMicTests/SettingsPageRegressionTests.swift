@@ -181,7 +181,29 @@ struct SettingsPageRegressionTests {
         #expect(RemoteMappingLayout.appleButtonPlacements.count == 12)
         #expect(!RemoteMappingLayout.appleButtonPlacements.contains { $0.button == .home || $0.button == .menu })
         #expect(RemoteMappingLayout.appleVoiceAnchor == UnitPoint(x: 0.50, y: 0.128))
+        #expect(RemoteMappingLayout.siriRemoteHorizontalScale > 1)
         #expect(RemoteMappingLayout.cardWidth(for: canvasWidth) == 300)
+
+        let appleLeftTargets = RemoteMappingLayout.appleButtonPlacements
+            .filter { $0.side == .left }
+            .map(\.targetY)
+        let appleRightTargets = RemoteMappingLayout.appleButtonPlacements
+            .filter { $0.side == .right }
+            .map(\.targetY)
+        #expect(appleLeftTargets.last == 0.90)
+        #expect(appleRightTargets.last == 0.90)
+        #expect((appleLeftTargets[1] - appleLeftTargets[0]) > (appleRightTargets[1] - appleRightTargets[0]))
+
+        let unscaledPower = RemoteMappingLayout.remotePoint(
+            for: RemoteMappingLayout.appleButtonPlacements[0].anchor,
+            canvasWidth: canvasWidth
+        )
+        let scaledPower = RemoteMappingLayout.remotePoint(
+            for: RemoteMappingLayout.appleButtonPlacements[0].anchor,
+            canvasWidth: canvasWidth,
+            horizontalScale: RemoteMappingLayout.siriRemoteHorizontalScale
+        )
+        #expect(scaledPower.x > unscaledPower.x)
 
         let menuPlacement = try #require(placements.first { $0.button == .menu })
         let tvPlacement = try #require(placements.first { $0.button == .tv })
