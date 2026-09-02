@@ -74,7 +74,7 @@ enum RemoteBackendKind: String, Codable, CaseIterable, Identifiable {
         case .siriRemote:
             return [
                 .power, .up, .left, .ok, .right, .down, .back,
-                .volumeUp, .volumeDown, .menu, .tv,
+                .volumeUp, .volumeDown, .tv,
                 .playPause, .mute, .voice,
             ]
         }

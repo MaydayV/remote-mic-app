@@ -525,10 +525,8 @@ struct SettingsView: View {
                         .stroke(Color.accentColor.opacity(0.65), lineWidth: 1)
                 }
 
-                Image(systemName: "appletvremote.gen4.fill")
-                    .font(.system(size: 68, weight: .regular))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(height: 166)
+                SiriRemotePhoto()
+                    .frame(width: 82, height: 166)
 
                 VStack(alignment: .leading, spacing: 9) {
                     connectionStatusLine(
@@ -3496,6 +3494,26 @@ private enum SiriRemoteImageResource {
         }
         return NSImage(contentsOf: url)
     }()
+}
+
+private struct SiriRemotePhoto: View {
+    var body: some View {
+        Group {
+            if let photo = SiriRemoteImageResource.image {
+                Image(nsImage: photo)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "appletvremote.gen4.fill")
+                            .font(.system(size: 54))
+                            .foregroundStyle(.secondary)
+                    }
+            }
+        }
+    }
 }
 
 private struct RC003Photo: View {

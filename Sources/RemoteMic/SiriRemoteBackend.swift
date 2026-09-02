@@ -399,7 +399,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     nonisolated static func identifyButton(page: UInt32, usage: UInt32) -> RemoteButton? {
         switch (page, usage) {
         // Generic Desktop
-        case (0x01, 0x86), (0x01, 0x40): return .menu
+        case (0x01, 0x86), (0x01, 0x40): return .back
         // Consumer
         case (0x0C, 0x04): return .voice          // Siri（实际）
         case (0x0C, 0x60), (0x0C, 0x223): return .tv
@@ -413,7 +413,9 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         case (0x0C, 0xEA): return .volumeDown
         case (0x0C, 0xE2), (0x0C, 0x20): return .mute
         case (0x0C, 0x30): return .power
-        case (0x0C, 0x40): return .menu
+        // 第三代 Siri Remote 已用 Back 键取代旧款 Menu 键；部分 macOS HID
+        // 桥仍会把它报告为旧 Menu usage，因此统一归一到同一个 Back 映射。
+        case (0x0C, 0x40): return .back
         case (0x0C, 0x224): return .back
         // Button Page
         case (0x09, 0x01): return .ok
@@ -509,7 +511,11 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
 
     private func refreshBatteryLevelUsingBluetooth() {
         guard !devices.isEmpty else { return }
-        batteryReader.read { [weak self] level in
+        batteryReader.read(
+            remoteName: devices.values.first.flatMap { device in
+                deviceNames[ObjectIdentifier(device)]
+            }
+        ) { [weak self] level in
             guard let self, !self.devices.isEmpty, let level else { return }
             self.batteryLevel = level
         }

@@ -23,13 +23,13 @@ struct SiriRemoteBackendTests {
         #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0xE2) == .mute)
         #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0x20) == .mute)        // Mute alt
         #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0x30) == .power)
-        #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0x40) == .menu)
+        #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0x40) == .back)
         #expect(SiriRemoteBackend.identifyButton(page: 0x0C, usage: 0x224) == .back)
     }
 
     @Test func mapsGenericDesktopAndButtonPages() {
-        #expect(SiriRemoteBackend.identifyButton(page: 0x01, usage: 0x86) == .menu)        // System Menu
-        #expect(SiriRemoteBackend.identifyButton(page: 0x01, usage: 0x40) == .menu)
+        #expect(SiriRemoteBackend.identifyButton(page: 0x01, usage: 0x86) == .back)        // Back/Menu
+        #expect(SiriRemoteBackend.identifyButton(page: 0x01, usage: 0x40) == .back)
         #expect(SiriRemoteBackend.identifyButton(page: 0x09, usage: 0x01) == .ok)          // Button 1
     }
 
@@ -52,8 +52,10 @@ struct SiriRemoteBackendTests {
 
     @Test func siriRemoteSupportedButtonsExcludeNothingEssential() {
         let backendButtons = Set(SiriRemoteBackend().supportedButtons)
+        #expect(backendButtons.count == 13)
+        #expect(!backendButtons.contains(.menu))
         // Siri Remote 必须覆盖统一事件的全部核心键
-        for required in [RemoteButton.up, .down, .left, .right, .ok, .back, .homeOrMenu,
+        for required in [RemoteButton.up, .down, .left, .right, .ok, .back,
                          .playPause, .volumeUp, .volumeDown, .mute, .power, .voice] {
             #expect(backendButtons.contains(required), Comment(rawValue: required.rawValue))
         }
@@ -110,11 +112,6 @@ struct SiriRemoteBackendTests {
         #expect(SiriRemoteBatteryReader.isLikelyRemoteName("Marcus Siri Remote"))
         #expect(!SiriRemoteBatteryReader.isLikelyRemoteName("Magic Mouse"))
     }
-}
-
-private extension RemoteButton {
-    /// 测试辅助：Siri Remote 的 menu 键承担 SayAll 的 menu（home 键 Siri Remote 无）
-    static let homeOrMenu = RemoteButton.menu
 }
 
 // MARK: - 0xFA 音频报告解析器测试

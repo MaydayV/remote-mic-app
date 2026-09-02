@@ -19,11 +19,13 @@ final class SiriRemoteBatteryReader: NSObject,
     /// Only disconnect links created by this reader. A peripheral returned by
     /// `retrieveConnectedPeripherals` may be the system HID transport itself.
     private var ownsPeripheralConnection = false
+    private var preferredRemoteName: String?
     private var completion: ((Int?) -> Void)?
     private var timeoutTimer: Timer?
 
-    func read(completion: @escaping (Int?) -> Void) {
+    func read(remoteName: String? = nil, completion: @escaping (Int?) -> Void) {
         cancel(deliverResult: true)
+        preferredRemoteName = remoteName
         self.completion = completion
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeoutInterval, repeats: false) {
             [weak self] _ in
@@ -59,7 +61,8 @@ final class SiriRemoteBatteryReader: NSObject,
         guard completion != nil else { return }
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let peripheralName = peripheral.name.flatMap { $0.isEmpty ? nil : $0 }
-        guard Self.isLikelyRemoteName(peripheralName ?? advertisedName ?? "") else { return }
+        let name = peripheralName ?? advertisedName ?? preferredRemoteName ?? ""
+        guard Self.isLikelyRemoteName(name) else { return }
         central.stopScan()
         connect(peripheral)
     }
@@ -143,8 +146,10 @@ final class SiriRemoteBatteryReader: NSObject,
             }) {
                 connect(remote)
             } else if !central.isScanning {
+                // HID-over-BLE 设备经常不在广播包里声明 180F，先扫描全部外围设备，
+                // 再用 Siri Remote 名称筛选并发现标准电池服务。
                 central.scanForPeripherals(
-                    withServices: [batteryServiceUUID],
+                    withServices: nil,
                     options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
                 )
             }
@@ -186,6 +191,7 @@ final class SiriRemoteBatteryReader: NSObject,
         }
         peripheral = nil
         ownsPeripheralConnection = false
+        preferredRemoteName = nil
         let pendingCompletion = completion
         completion = nil
         if deliverResult {
