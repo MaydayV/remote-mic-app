@@ -178,6 +178,9 @@ struct SettingsPageRegressionTests {
         #expect(leftEnd == CGPoint(x: cardWidth, y: RemoteMappingLayout.canvasHeight / 2))
         #expect(rightEnd == CGPoint(x: canvasWidth - cardWidth, y: RemoteMappingLayout.canvasHeight / 2))
         #expect(RemoteMappingLayout.voiceAnchor == UnitPoint(x: 0.630, y: 0.099))
+        #expect(RemoteMappingLayout.appleButtonPlacements.count == 12)
+        #expect(!RemoteMappingLayout.appleButtonPlacements.contains { $0.button == .home || $0.button == .menu })
+        #expect(RemoteMappingLayout.appleVoiceAnchor == UnitPoint(x: 0.50, y: 0.128))
         #expect(RemoteMappingLayout.cardWidth(for: canvasWidth) == 300)
 
         let menuPlacement = try #require(placements.first { $0.button == .menu })

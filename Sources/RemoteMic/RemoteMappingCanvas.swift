@@ -36,23 +36,23 @@ enum RemoteMappingLayout {
     ]
 
     static let appleButtonPlacements: [RemoteMappingPlacement] = [
-        RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.386, y: 0.099), targetY: 0.08),
-        RemoteMappingPlacement(button: .up, side: .left, anchor: UnitPoint(x: 0.502, y: 0.179), targetY: 0.22),
-        RemoteMappingPlacement(button: .left, side: .left, anchor: UnitPoint(x: 0.362, y: 0.246), targetY: 0.36),
-        RemoteMappingPlacement(button: .back, side: .left, anchor: UnitPoint(x: 0.406, y: 0.389), targetY: 0.50),
-        RemoteMappingPlacement(button: .home, side: .left, anchor: UnitPoint(x: 0.406, y: 0.479), targetY: 0.64),
-        RemoteMappingPlacement(button: .menu, side: .left, anchor: UnitPoint(x: 0.406, y: 0.569), targetY: 0.78),
-        RemoteMappingPlacement(button: .playPause, side: .left, anchor: UnitPoint(x: 0.500, y: 0.680), targetY: 0.92),
-        RemoteMappingPlacement(button: .right, side: .right, anchor: UnitPoint(x: 0.638, y: 0.246), targetY: 0.205),
-        RemoteMappingPlacement(button: .ok, side: .right, anchor: UnitPoint(x: 0.502, y: 0.246), targetY: 0.325),
-        RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.502, y: 0.317), targetY: 0.445),
-        RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.604, y: 0.390), targetY: 0.565),
-        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.604, y: 0.480), targetY: 0.685),
-        RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.604, y: 0.569), targetY: 0.805),
-        RemoteMappingPlacement(button: .mute, side: .right, anchor: UnitPoint(x: 0.604, y: 0.680), targetY: 0.925),
+        // Siri Remote 图片是正方形素材，按遥控器实际按钮中心换算到画布坐标。
+        RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.63, y: 0.128), targetY: 0.08),
+        RemoteMappingPlacement(button: .up, side: .left, anchor: UnitPoint(x: 0.50, y: 0.175), targetY: 0.21),
+        RemoteMappingPlacement(button: .left, side: .left, anchor: UnitPoint(x: 0.32, y: 0.259), targetY: 0.34),
+        RemoteMappingPlacement(button: .back, side: .left, anchor: UnitPoint(x: 0.41, y: 0.400), targetY: 0.47),
+        RemoteMappingPlacement(button: .playPause, side: .left, anchor: UnitPoint(x: 0.41, y: 0.493), targetY: 0.60),
+        RemoteMappingPlacement(button: .mute, side: .left, anchor: UnitPoint(x: 0.41, y: 0.584), targetY: 0.73),
+        RemoteMappingPlacement(button: .right, side: .right, anchor: UnitPoint(x: 0.73, y: 0.259), targetY: 0.19),
+        RemoteMappingPlacement(button: .ok, side: .right, anchor: UnitPoint(x: 0.50, y: 0.259), targetY: 0.31),
+        RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.50, y: 0.347), targetY: 0.43),
+        RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.59, y: 0.400), targetY: 0.55),
+        RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.59, y: 0.493), targetY: 0.67),
+        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.59, y: 0.730), targetY: 0.79),
     ]
 
     static let voiceAnchor = UnitPoint(x: 0.630, y: 0.099)
+    static let appleVoiceAnchor = UnitPoint(x: 0.50, y: 0.128)
     static let voiceTargetY: CGFloat = 0.07
 
     static func remotePoint(for anchor: UnitPoint, canvasWidth: CGFloat) -> CGPoint {
@@ -174,7 +174,11 @@ struct RemoteMappingCanvas: View {
             }
             drawConnection(
                 context: &context,
-                start: metrics.remotePoint(for: RemoteMappingLayout.voiceAnchor),
+                start: metrics.remotePoint(
+                    for: usesSiriRemotePhoto
+                        ? RemoteMappingLayout.appleVoiceAnchor
+                        : RemoteMappingLayout.voiceAnchor
+                ),
                 end: metrics.cardEdgePoint(side: .right, targetY: RemoteMappingLayout.voiceTargetY),
                 side: .right,
                 selected: voiceActive,
