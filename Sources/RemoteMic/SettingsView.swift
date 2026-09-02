@@ -3503,7 +3503,7 @@ private struct SiriRemotePhoto: View {
                 Image(nsImage: photo)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .scaleEffect(x: RemoteMappingLayout.siriRemoteHorizontalScale, y: 1)
+                    .scaleEffect(RemoteMappingLayout.siriRemoteScale)
                     .clipped()
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)

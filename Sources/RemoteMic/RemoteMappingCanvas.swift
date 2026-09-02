@@ -19,9 +19,9 @@ enum RemoteMappingLayout {
     static let canvasHeight: CGFloat = 570
     static let remoteSize = CGSize(width: 202, height: 410)
     static let arrowCardGap: CGFloat = 7
-    /// Siri Remote 的原图带有很宽的透明边距；横向放大后，遥控器本体
-    /// 与 RC003 在画布上的视觉尺寸一致，同时保留纵向按键比例。
-    static let siriRemoteHorizontalScale: CGFloat = 2.1
+    /// Siri Remote 的原图带有透明边距；等比放大后提升本体可见尺寸，
+    /// 同时保持圆形按键和遥控器外形不变形。
+    static let siriRemoteScale: CGFloat = 1.18
 
     static let buttonPlacements: [RemoteMappingPlacement] = [
         RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.386, y: 0.099), targetY: 0.08),
@@ -63,16 +63,17 @@ enum RemoteMappingLayout {
     static func remotePoint(
         for anchor: UnitPoint,
         canvasWidth: CGFloat,
-        horizontalScale: CGFloat = 1
+        imageScale: CGFloat = 1
     ) -> CGPoint {
         let remoteOrigin = CGPoint(
             x: canvasWidth / 2 - remoteSize.width / 2,
             y: (canvasHeight - remoteSize.height) / 2
         )
-        let renderedX = 0.5 + (anchor.x - 0.5) * horizontalScale
+        let renderedX = 0.5 + (anchor.x - 0.5) * imageScale
+        let renderedY = 0.5 + (anchor.y - 0.5) * imageScale
         return CGPoint(
             x: remoteOrigin.x + remoteSize.width * renderedX,
-            y: remoteOrigin.y + remoteSize.height * anchor.y
+            y: remoteOrigin.y + remoteSize.height * renderedY
         )
     }
 
@@ -400,8 +401,8 @@ struct RemoteMappingCanvas: View {
             RemoteMappingLayout.remotePoint(
                 for: anchor,
                 canvasWidth: width,
-                horizontalScale: usesSiriRemotePhoto
-                    ? RemoteMappingLayout.siriRemoteHorizontalScale
+                imageScale: usesSiriRemotePhoto
+                    ? RemoteMappingLayout.siriRemoteScale
                     : 1
             )
         }
@@ -437,7 +438,7 @@ private struct MappingRemotePhoto: View {
                 Image(nsImage: photo)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .scaleEffect(x: RemoteMappingLayout.siriRemoteHorizontalScale, y: 1)
+                    .scaleEffect(RemoteMappingLayout.siriRemoteScale)
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.quaternary)
