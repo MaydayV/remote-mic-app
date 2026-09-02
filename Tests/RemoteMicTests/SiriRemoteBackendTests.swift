@@ -64,6 +64,41 @@ struct SiriRemoteBackendTests {
         #expect(!RemoteBackendRuntimePolicy.shouldRunSiriRemote(activeKind: .xiaomi))
     }
 
+    @Test func acceptsKnownAppleRemoteProductEvenWithGenericName() {
+        #expect(SiriRemoteBackend.isSupportedDevice(
+            vendorID: 0x004C,
+            productID: 0x026D,
+            productName: "Apple HID Device"
+        ))
+    }
+
+    @Test func acceptsNewRemoteWhenNameIdentifiesIt() {
+        #expect(SiriRemoteBackend.isSupportedDevice(
+            vendorID: 0x004C,
+            productID: 0x9999,
+            productName: "Apple TV Remote"
+        ))
+    }
+
+    @Test func rejectsNonAppleAndUnidentifiedHidDevices() {
+        #expect(!SiriRemoteBackend.isSupportedDevice(
+            vendorID: 0x05AC,
+            productID: 0x026D,
+            productName: "Apple TV Remote"
+        ))
+        #expect(!SiriRemoteBackend.isSupportedDevice(
+            vendorID: 0x004C,
+            productID: 0x9999,
+            productName: "Apple Magic Mouse"
+        ))
+    }
+
+    @Test func parsesCommonIOKitNumericPropertyRepresentations() {
+        #expect(SiriRemoteBackend.integerValue(NSNumber(value: 0x026D)) == 0x026D)
+        #expect(SiriRemoteBackend.integerValue(UInt32(0x004C)) == 0x004C)
+        #expect(SiriRemoteBackend.integerValue("0x026D") == nil)
+    }
+
     @Test func keepsSystemCriticalConsumerCollectionsShared() {
         #expect(SiriRemoteBackend.requiresSharedSystemAccess(usagePage: 0x0C, usage: 0x04))
         #expect(SiriRemoteBackend.requiresSharedSystemAccess(usagePage: 0x0C, usage: 0x01))

@@ -288,7 +288,7 @@ struct SettingsPageRegressionTests {
         #expect(!mappingCanvasSource.contains("size: 10"))
         #expect(!mappingCanvasSource.contains("size: 11"))
         #expect(!mappingCanvasSource.contains("minimumScaleFactor"))
-        #expect(source.range(of: "MappingRemotePhoto()")!.lowerBound < source.range(of: "connectionLines(metrics: metrics)")!.lowerBound)
+        #expect(source.range(of: "MappingRemotePhoto(")!.lowerBound < source.range(of: "connectionLines(metrics: metrics)")!.lowerBound)
 
         let voiceFnToggle = "Toggle(\"connection.voice_fn_tap.enabled\""
         #expect(source.components(separatedBy: voiceFnToggle).count == 2)

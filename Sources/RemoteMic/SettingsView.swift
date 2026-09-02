@@ -378,7 +378,12 @@ struct SettingsView: View {
             model.setActiveBackend(kind)
         } label: {
             HStack(spacing: 12) {
-                if kind == .siriRemote, let photo = SiriRemoteImageResource.image {
+                if kind == .xiaomi, let photo = RC003ImageResource.image {
+                    Image(nsImage: photo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 34, height: 68)
+                } else if kind == .siriRemote, let photo = SiriRemoteImageResource.image {
                     Image(nsImage: photo)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -748,19 +753,17 @@ struct SettingsView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
-                        Group {
-                            if model.activeBackendKind == .siriRemote {
-                                siriRemoteMappingGrid
-                            } else {
-                                RemoteMappingCanvas(
-                                    selectedButton: $selectedRemoteButton,
-                                    activeButtons: model.activeRemoteButtons,
-                                    voiceActive: model.isStreaming,
-                                    actionSummary: mappingActionSummary,
-                                    onEdit: beginMappingEdit
-                                )
-                            }
-                        }
+                        RemoteMappingCanvas(
+                            selectedButton: $selectedRemoteButton,
+                            activeButtons: model.activeBackendKind == .siriRemote
+                                ? model.activeSiriRemoteButtons
+                                : model.activeRemoteButtons,
+                            supportedButtons: Set(model.activeBackendKind.supportedButtons),
+                            usesSiriRemotePhoto: model.activeBackendKind == .siriRemote,
+                            voiceActive: model.isStreaming,
+                            actionSummary: mappingActionSummary,
+                            onEdit: beginMappingEdit
+                        )
                         .onReceive(model.$activeRemoteButtons) { buttons in
                             guard model.activeBackendKind == .xiaomi else { return }
                             selectedRemoteButton = MappingSelectionPolicy.selection(

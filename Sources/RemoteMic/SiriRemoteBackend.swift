@@ -58,9 +58,8 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
 
     private let appleVendorID = 0x004C
 
-    /// 已知 Siri Remote / Apple TV Remote 产品 ID（VibeRemote 实测；产品名优先于 ID，
-    /// 因为 Apple 在相近配件上复用 ID）
-    private static let knownProductIDs: Set<Int> = [
+    /// 已知 Siri Remote / Apple TV Remote 产品 ID（VibeRemote 实测）。
+    private nonisolated static let knownProductIDs: Set<Int> = [
         0x0221, 0x0255, 0x0266, 0x0267, 0x026D,
         0x0C4E, 0x0C4F, 0x030D, 0x030E, 0x0314, 0x0315,
     ]
@@ -73,6 +72,8 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     private lazy var batteryReader = SiriRemoteBatteryReader()
     private var batteryRefreshTimer: Timer?
     private var started = false
+    /// HID manager 是否成功打开。权限变化或系统睡眠唤醒后可能失效，由健康检查自动重建。
+    private var detectionOpen = false
 
     /// 音频报告回调注册（M3 使用；按键接口在 M2 可用）
     private var audioReportRegistrations: [ObjectIdentifier: (buffer: UnsafeMutablePointer<UInt8>, size: Int)] = [:]
@@ -101,6 +102,12 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     // MARK: - 麦克风（M3 实现）
 
     func startMicrophone() {
+        guard !devices.isEmpty else {
+            voiceActive = false
+            AppLogger.shared.write("SIRI REMOTE voice unavailable reason=no_connected_hid_interface")
+            onVoiceStreamEnded?()
+            return
+        }
         // 0xAF input-enable 已在接口打开时写入；首次使用时初始化解码器
         if opusDecoder == nil {
             opusDecoder = try? OpusDecoder()
@@ -152,6 +159,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
 
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
         let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        detectionOpen = result == kIOReturnSuccess
         if result == kIOReturnNotPermitted {
             AppLogger.shared.write("SIRI REMOTE detection denied input_monitoring_required=true")
         } else if result != kIOReturnSuccess {
@@ -188,6 +196,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         }
         hidManager = nil
+        detectionOpen = false
         if voiceActive {
             voiceActive = false
             onVoiceStreamEnded?()
@@ -209,14 +218,11 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         let usagePage = Self.property(kIOHIDPrimaryUsagePageKey, of: device) ?? 0
         let usage = Self.property(kIOHIDPrimaryUsageKey, of: device) ?? 0
 
-        // 产品名优先：Apple 在相近配件上复用 product ID
-        let isLikelyRemote: Bool
-        if let productName, !productName.isEmpty {
-            isLikelyRemote = Self.isLikelyRemoteName(productName)
-        } else {
-            isLikelyRemote = Self.knownProductIDs.contains(product)
-        }
-        guard vendor == appleVendorID, isLikelyRemote else { return }
+        guard Self.isSupportedDevice(
+            vendorID: vendor,
+            productID: product,
+            productName: productName
+        ) else { return }
 
         devices[id] = device
         deviceNames[id] = productName ?? String(format: "0x%04X", product)
@@ -349,7 +355,15 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     }
 
     private func recoverFromStaleInterfacesIfNeeded() {
-        guard started, !deviceRegistryIDs.isEmpty else { return }
+        guard started else { return }
+        guard detectionOpen else {
+            AppLogger.shared.write("SIRI REMOTE HID manager is not open; restarting discovery")
+            disconnectAll()
+            guard started else { return }
+            startDetection()
+            return
+        }
+        guard !deviceRegistryIDs.isEmpty else { return }
         let hasStaleInterface = deviceRegistryIDs.values.contains { registryID in
             let service = IOServiceGetMatchingService(0, IORegistryEntryIDMatching(registryID))
             guard service != IO_OBJECT_NULL else { return true }
@@ -544,13 +558,38 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
             || lowered.contains("apple tv")
     }
 
+    /// 设备筛选策略：优先接受已知 Apple Remote 产品 ID，同时允许名称明确表明为遥控器的
+    /// 新型号。这避免系统把产品名暴露成通用字符串时误拒已知型号，也不会接管其他厂商 HID。
+    nonisolated static func isSupportedDevice(
+        vendorID: Int,
+        productID: Int,
+        productName: String?
+    ) -> Bool {
+        guard vendorID == 0x004C else { return false }
+        return knownProductIDs.contains(productID)
+            || (productName.map(isLikelyRemoteName) ?? false)
+    }
+
+    nonisolated static func integerValue(_ value: Any?) -> Int? {
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        if let int = value as? Int {
+            return int
+        }
+        if let uint = value as? UInt32 {
+            return Int(uint)
+        }
+        return nil
+    }
+
     nonisolated static func property(_ key: String, of device: IOHIDDevice) -> Int? {
         let value = IOHIDDeviceGetProperty(device, key as CFString)
-        return value as? Int
+        return integerValue(value)
     }
 
     nonisolated static func stringProperty(_ key: String, of device: IOHIDDevice) -> String? {
         let value = IOHIDDeviceGetProperty(device, key as CFString)
-        return value as? String
+        return value as? String ?? (value as? NSString).map(String.init)
     }
 }

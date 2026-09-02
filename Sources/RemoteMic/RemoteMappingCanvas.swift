@@ -35,6 +35,23 @@ enum RemoteMappingLayout {
         RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.604, y: 0.569), targetY: 0.94),
     ]
 
+    static let appleButtonPlacements: [RemoteMappingPlacement] = [
+        RemoteMappingPlacement(button: .power, side: .left, anchor: UnitPoint(x: 0.386, y: 0.099), targetY: 0.08),
+        RemoteMappingPlacement(button: .up, side: .left, anchor: UnitPoint(x: 0.502, y: 0.179), targetY: 0.22),
+        RemoteMappingPlacement(button: .left, side: .left, anchor: UnitPoint(x: 0.362, y: 0.246), targetY: 0.36),
+        RemoteMappingPlacement(button: .back, side: .left, anchor: UnitPoint(x: 0.406, y: 0.389), targetY: 0.50),
+        RemoteMappingPlacement(button: .home, side: .left, anchor: UnitPoint(x: 0.406, y: 0.479), targetY: 0.64),
+        RemoteMappingPlacement(button: .menu, side: .left, anchor: UnitPoint(x: 0.406, y: 0.569), targetY: 0.78),
+        RemoteMappingPlacement(button: .playPause, side: .left, anchor: UnitPoint(x: 0.500, y: 0.680), targetY: 0.92),
+        RemoteMappingPlacement(button: .right, side: .right, anchor: UnitPoint(x: 0.638, y: 0.246), targetY: 0.205),
+        RemoteMappingPlacement(button: .ok, side: .right, anchor: UnitPoint(x: 0.502, y: 0.246), targetY: 0.325),
+        RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.502, y: 0.317), targetY: 0.445),
+        RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.604, y: 0.390), targetY: 0.565),
+        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.604, y: 0.480), targetY: 0.685),
+        RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.604, y: 0.569), targetY: 0.805),
+        RemoteMappingPlacement(button: .mute, side: .right, anchor: UnitPoint(x: 0.604, y: 0.680), targetY: 0.925),
+    ]
+
     static let voiceAnchor = UnitPoint(x: 0.630, y: 0.099)
     static let voiceTargetY: CGFloat = 0.07
 
@@ -93,15 +110,27 @@ struct RemoteMappingCanvas: View {
 
     @Binding var selectedButton: RemoteButton
     let activeButtons: Set<RemoteButton>
+    let supportedButtons: Set<RemoteButton>
+    let usesSiriRemotePhoto: Bool
     let voiceActive: Bool
     let actionSummary: (RemoteButton, ButtonTrigger) -> String
     let onEdit: (RemoteButton, ButtonTrigger) -> Void
 
+    private var visiblePlacements: [RemoteMappingPlacement] {
+        (supportedButtons.contains(.playPause)
+            ? RemoteMappingLayout.appleButtonPlacements
+            : RemoteMappingLayout.buttonPlacements)
+            .filter { supportedButtons.contains($0.button) }
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            let metrics = Metrics(width: geometry.size.width)
+            let metrics = Metrics(
+                width: geometry.size.width,
+                compact: supportedButtons.contains(.playPause)
+            )
             ZStack {
-                MappingRemotePhoto()
+                MappingRemotePhoto(usesSiriRemotePhoto: usesSiriRemotePhoto)
                     .frame(
                         width: RemoteMappingLayout.remoteSize.width,
                         height: RemoteMappingLayout.remoteSize.height
@@ -111,7 +140,7 @@ struct RemoteMappingCanvas: View {
 
                 connectionLines(metrics: metrics)
 
-                ForEach(RemoteMappingLayout.buttonPlacements) { placement in
+                ForEach(visiblePlacements) { placement in
                     mappingCard(placement.button)
                         .frame(width: metrics.cardWidth, height: metrics.cardHeight)
                         .position(
@@ -133,7 +162,7 @@ struct RemoteMappingCanvas: View {
 
     private func connectionLines(metrics: Metrics) -> some View {
         Canvas { context, _ in
-            for placement in RemoteMappingLayout.buttonPlacements {
+            for placement in visiblePlacements {
                 drawConnection(
                     context: &context,
                     start: metrics.remotePoint(for: placement.anchor),
@@ -323,10 +352,11 @@ struct RemoteMappingCanvas: View {
     private struct Metrics {
         let width: CGFloat
         let cardWidth: CGFloat
-        let cardHeight: CGFloat = 72
+        let cardHeight: CGFloat
 
-        init(width: CGFloat) {
+        init(width: CGFloat, compact: Bool) {
             self.width = width
+            cardHeight = compact ? 64 : 72
             cardWidth = RemoteMappingLayout.cardWidth(for: width)
         }
 
@@ -355,9 +385,17 @@ struct RemoteMappingCanvas: View {
 }
 
 private enum MappingRemoteImageResource {
-    static let image: NSImage? = {
+    static let xiaomiImage: NSImage? = {
         guard let url = Bundle.main.url(
             forResource: "RC003-remote-photo",
+            withExtension: "png"
+        ) else { return nil }
+        return NSImage(contentsOf: url)
+    }()
+
+    static let siriImage: NSImage? = {
+        guard let url = Bundle.main.url(
+            forResource: "SiriRemote-photo",
             withExtension: "png"
         ) else { return nil }
         return NSImage(contentsOf: url)
@@ -365,9 +403,13 @@ private enum MappingRemoteImageResource {
 }
 
 private struct MappingRemotePhoto: View {
+    let usesSiriRemotePhoto: Bool
+
     var body: some View {
         Group {
-            if let photo = MappingRemoteImageResource.image {
+            if let photo = usesSiriRemotePhoto
+                ? MappingRemoteImageResource.siriImage
+                : MappingRemoteImageResource.xiaomiImage {
                 Image(nsImage: photo)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
