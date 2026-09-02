@@ -48,7 +48,7 @@ enum RemoteMappingLayout {
         RemoteMappingPlacement(button: .down, side: .right, anchor: UnitPoint(x: 0.50, y: 0.347), targetY: 0.43),
         RemoteMappingPlacement(button: .tv, side: .right, anchor: UnitPoint(x: 0.59, y: 0.400), targetY: 0.55),
         RemoteMappingPlacement(button: .volumeUp, side: .right, anchor: UnitPoint(x: 0.59, y: 0.493), targetY: 0.67),
-        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.59, y: 0.730), targetY: 0.79),
+        RemoteMappingPlacement(button: .volumeDown, side: .right, anchor: UnitPoint(x: 0.59, y: 0.584), targetY: 0.79),
     ]
 
     static let voiceAnchor = UnitPoint(x: 0.630, y: 0.099)
