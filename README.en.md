@@ -90,7 +90,7 @@ Each ordinary button supports a single-click action and optional double-click an
 - A long press triggers after about 0.55 seconds and suppresses the single-click action.
 - Buttons with a configured double-click or long-press do not hold-repeat, preventing multiple actions from firing at once.
 
-The voice button is always reserved for voice input and Fn functions and does not participate in ordinary button mapping.
+The voice button is always reserved for voice input and Fn functions and does not participate in ordinary button mapping; choose Fn/Globe, Left Command, Right Command, or Right Option hold in its dedicated area.
 
 ## Usage statistics
 

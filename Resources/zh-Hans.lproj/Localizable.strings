@@ -558,6 +558,7 @@
 "connection.voice_key.mode.fn" = "Fn / 地球";
 "connection.voice_key.mode.left_command" = "左 Command";
 "connection.voice_key.mode.right_command" = "右 Command";
+"connection.voice_key.mode.right_option" = "右 Option（⌥）";
 "connection.voice_key.mode.hint" = "选择语音采集期间模拟的按键。Command 模式需要辅助功能权限。";
 "button_mapping.rapid_press" = "允许快速连续按下";
 "button_mapping.rapid_press_hint_short" = "适合快速连续点按；长按可能触发多次操作。";
