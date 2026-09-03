@@ -48,6 +48,11 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     var onBatteryLevelChange: ((Int?) -> Void)?
     /// 连接状态变化回调（HID 设备匹配/移除时触发）
     var onConnectionStateChange: ((Bool) -> Void)?
+    /// 原生 HCI 捕获进程状态（不是蓝牙连接状态）。
+    var onNativeMicCaptureStateChange: ((Bool) -> Void)?
+    /// 原生捕获空闲时的内置麦克风降级流。
+    var onBuiltinMicFallbackSamples: (([Float], Double) -> Void)?
+    var onBuiltinMicFallbackStateChange: ((Bool) -> Void)?
     /// 音频流自身结束（用于在按键 release 丢失时关闭上层语音会话）
     var onVoiceStreamEnded: (() -> Void)?
 
@@ -82,6 +87,14 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     private var opusDecoder: OpusDecoder?
     /// 当前是否处于语音会话（0xFA 流活跃）
     private var voiceActive = false
+    /// 原生 HCI 路径收到帧后，Direct HID 路径只保留为未交付主机的回退，避免重复音频。
+    private var nativeAudioFrameSeen = false
+    /// PacketLogger/HCI 捕获路径；复用现有 Opus 解码与虚拟音频输出。
+    private let nativeMicCapture = SiriRemoteNativeMicCapture()
+    private let builtinMicFallback = SiriRemoteBuiltinMicFallback()
+    /// Optional IPC for the system-wide Siri Remote Mic HAL. The app-level
+    /// VirtualAudioOutput remains authoritative when no HAL is installed.
+    private let sharedMicRing = SiriRemoteMicSharedRingWriter()
     /// 按键状态去重：Siri Remote 会在多个镜像接口重复报告同一按键，只在状态翻转时发出
     private var buttonState: [RemoteButton: Bool] = [:]
 
@@ -90,12 +103,44 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     func start() {
         guard !started else { return }
         started = true
+        sharedMicRing.start()
+        nativeMicCapture.onAudioSamples = { [weak self] samples, sampleRate in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.nativeAudioFrameSeen = true
+                self.sharedMicRing.writeRemote(samples)
+                self.onAudioSamples?(samples, sampleRate)
+            }
+        }
+        nativeMicCapture.onCaptureStateChange = { [weak self] running in
+            Task { @MainActor [weak self] in
+                self?.onNativeMicCaptureStateChange?(running)
+            }
+        }
+        builtinMicFallback.onAudioSamples = { [weak self] samples, sampleRate in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.sharedMicRing.writeBuiltin(samples)
+                self.onBuiltinMicFallbackSamples?(samples, sampleRate)
+            }
+        }
+        builtinMicFallback.onStateChange = { [weak self] running in
+            Task { @MainActor [weak self] in
+                self?.sharedMicRing.setBuiltinActive(running)
+                self?.onBuiltinMicFallbackStateChange?(running)
+            }
+        }
+        refreshNativeMicCapture()
         startDetection()
     }
 
     func stop() {
         guard started else { return }
         started = false
+        nativeMicCapture.stopVoice()
+        nativeMicCapture.stop()
+        builtinMicFallback.stop()
+        sharedMicRing.stop()
         disconnectAll()
     }
 
@@ -104,6 +149,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     func startMicrophone() {
         guard !devices.isEmpty else {
             voiceActive = false
+            sharedMicRing.setRemoteActive(false)
             AppLogger.shared.write("SIRI REMOTE voice unavailable reason=no_connected_hid_interface")
             onVoiceStreamEnded?()
             return
@@ -114,15 +160,36 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         }
         guard opusDecoder != nil else {
             voiceActive = false
+            sharedMicRing.setRemoteActive(false)
             AppLogger.shared.write("SIRI REMOTE voice unavailable reason=opus_decoder_init_failed")
             onVoiceStreamEnded?()
             return
         }
         voiceActive = true
+        nativeAudioFrameSeen = false
+        sharedMicRing.setRemoteActive(true)
+        nativeMicCapture.startVoice()
     }
 
     func stopMicrophone() {
         voiceActive = false
+        sharedMicRing.setRemoteActive(false)
+        nativeMicCapture.stopVoice()
+    }
+
+    /// Refresh the native capture process after the user changes the HCI setup
+    /// from Settings.  Do not launch PacketLogger when the trace preference is
+    /// disabled; Direct HID remains the only fallback in that state.
+    func refreshNativeMicCapture() {
+        guard started else { return }
+        nativeMicCapture.stop()
+        builtinMicFallback.stop()
+        guard SiriRemoteNativeMicCapture.hciTraceConfigurationPresent() else {
+            AppLogger.shared.write("SIRI REMOTE native mic capture skipped reason=trace_not_configured")
+            return
+        }
+        nativeMicCapture.start()
+        builtinMicFallback.start()
     }
 
     // MARK: - 设备发现
@@ -199,6 +266,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         detectionOpen = false
         if voiceActive {
             voiceActive = false
+            sharedMicRing.setRemoteActive(false)
             onVoiceStreamEnded?()
         }
         batteryLevel = nil
@@ -322,6 +390,7 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
             batteryReader.cancel()
             if voiceActive {
                 voiceActive = false
+                sharedMicRing.setRemoteActive(false)
                 onVoiceStreamEnded?()
             }
             batteryLevel = nil
@@ -439,10 +508,15 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
                 guard let decoder = opusDecoder, voiceActive,
                       let samples = try? decoder.decode(packet)
                 else { continue }
+                // Native HCI capture is authoritative once it produces a frame. Direct HID is
+                // retained as a fallback for hosts that expose the audio report normally.
+                guard !nativeAudioFrameSeen else { continue }
+                sharedMicRing.writeRemote(samples)
                 onAudioSamples?(samples, 48_000)
             case .ended:
                 if voiceActive {
                     voiceActive = false
+                    sharedMicRing.setRemoteActive(false)
                     onVoiceStreamEnded?()
                 }
             }

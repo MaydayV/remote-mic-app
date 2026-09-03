@@ -1,3 +1,4 @@
 "CFBundleDisplayName" = "无线麦";
 "CFBundleName" = "无线麦";
 "NSBluetoothAlwaysUsageDescription" = "连接小米蓝牙遥控器 2 Pro，接收按键与语音数据。";
+"NSMicrophoneUsageDescription" = "Siri 遥控器语音捕获空闲时，使用 Mac 麦克风作为降级输入。";

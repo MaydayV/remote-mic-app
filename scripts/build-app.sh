@@ -100,6 +100,14 @@ ditto --norsrc --noextattr --noqtn --noacl \
 ditto --norsrc --noextattr --noqtn --noacl \
   "$ROOT/Resources/SiriRemote-photo.png" \
   "$APP_DIR/Contents/Resources/SiriRemote-photo.png"
+# Ship the signed HAL driver inside the app so the Settings page can install
+# or remove it later without requiring a separate, undiscoverable package.
+# Local builds remain usable when no driver has been built yet.
+if [[ -d "$OUTPUT_DIR/MiRemoteV2ch.driver" ]]; then
+  ditto --norsrc --noextattr --noqtn --noacl \
+    "$OUTPUT_DIR/MiRemoteV2ch.driver" \
+    "$APP_DIR/Contents/Resources/MiRemoteV2ch.driver"
+fi
 for icon_resource in \
   AppIcon.icns \
   StatusIconTemplate.png \
@@ -137,6 +145,9 @@ for executable in \
     chmod 755 "$executable"
   fi
 done
+if [[ -f "$APP_DIR/Contents/Resources/MiRemoteV2ch.driver/Contents/MacOS/MiRemoteV2ch" ]]; then
+  chmod 755 "$APP_DIR/Contents/Resources/MiRemoteV2ch.driver/Contents/MacOS/MiRemoteV2ch"
+fi
 
 SPARKLE_VERSION_DIR="$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B"
 if [[ "$SIGNING_IDENTITY" != "-" ]]; then

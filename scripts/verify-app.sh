@@ -56,6 +56,14 @@ test -f "$APP/Contents/Resources/COPYRIGHT.md"
 test -f "$APP/Contents/Resources/LOGO-LICENSE.md"
 test -f "$APP/Contents/Resources/FirstInstallGuide.md"
 test -f "$APP/Contents/Resources/RC003-remote-photo.png"
+if [[ -d "$APP/Contents/Resources/MiRemoteV2ch.driver" ]]; then
+  DRIVER="$APP/Contents/Resources/MiRemoteV2ch.driver"
+  test -f "$DRIVER/Contents/Info.plist"
+  test -x "$DRIVER/Contents/MacOS/MiRemoteV2ch"
+  test "$(plutil -extract CFBundleIdentifier raw -o - "$DRIVER/Contents/Info.plist")" = \
+    "com.hd838a.MiRemoteV2ch"
+  codesign --verify --deep --strict "$DRIVER"
+fi
 test -f "$APP/Contents/Resources/AppIcon.icns"
 test -f "$APP/Contents/Resources/StatusIconTemplate.png"
 test -f "$APP/Contents/Resources/StatusIconTemplate@2x.png"

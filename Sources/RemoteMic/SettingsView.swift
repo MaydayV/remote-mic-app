@@ -190,9 +190,15 @@ struct SettingsView: View {
         .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
         .environment(\.locale, localization.locale)
         .frame(minWidth: 980, minHeight: 732)
-        .onAppear(perform: refreshPermissionStates)
+        .onAppear {
+            refreshPermissionStates()
+            model.refreshDoubaoDriverState()
+            model.refreshSiriRemoteNativeMicAvailability()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshPermissionStates()
+            model.refreshDoubaoDriverState()
+            model.refreshSiriRemoteNativeMicAvailability()
             resumeCustomMappingIfPermissionsGranted()
         }
         .sheet(isPresented: $isReleaseHistoryPresented) {
@@ -500,6 +506,76 @@ struct SettingsView: View {
         }
     }
 
+    private var siriRemoteNativeMicSetupCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: model.isSiriRemoteNativeMicConfigured
+                      ? "checkmark.circle.fill"
+                      : "waveform.badge.mic")
+                    .foregroundStyle(model.isSiriRemoteNativeMicConfigured ? .green : .orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("remote.backend.siri_native_setup_title")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(model.isSiriRemoteNativeMicConfigured
+                        ? (model.isSiriRemoteNativeMicCaptureRunning
+                            ? "remote.backend.siri_native_capture_running"
+                            : (model.isSiriRemoteBuiltinMicFallbackRunning
+                               ? "remote.backend.siri_builtin_fallback_running"
+                               : "remote.backend.siri_native_setup_enabled"))
+                         : "remote.backend.siri_native_setup_disabled")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+            }
+
+            Button {
+                model.setSiriRemoteNativeMicConfigured(!model.isSiriRemoteNativeMicConfigured)
+            } label: {
+                if model.isSiriRemoteNativeMicSetupRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text(model.isSiriRemoteNativeMicConfigured
+                         ? "remote.backend.siri_native_setup_disable"
+                         : "remote.backend.siri_native_setup_enable")
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(model.isSiriRemoteNativeMicSetupRunning)
+
+            if model.siriRemoteNativeMicSetupFailed {
+                Text("remote.backend.siri_native_setup_failed")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+            }
+
+            Text("remote.backend.siri_native_setup_hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !model.isSiriRemotePacketLoggerAvailable {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("remote.backend.siri_packetlogger_missing")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("remote.backend.siri_packetlogger_guide") {
+                    model.openSiriRemoteNativeMicGuide(using: localization)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     private var siriRemoteConnectionPanel: some View {
         GlassPanel {
             VStack(spacing: 16) {
@@ -551,6 +627,8 @@ struct SettingsView: View {
                         tint: .blue
                     )
                 }
+
+                siriRemoteNativeMicSetupCard
 
                 Button {
                     model.reconnect()
@@ -713,11 +791,75 @@ struct SettingsView: View {
                     .compatibilityButtonStyle(.standard)
                 }
 
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: doubaoDriverIsInstalled ? "checkmark.shield.fill" : "shippingbox")
+                        .foregroundStyle(doubaoDriverIsInstalled ? .green : .orange)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("audio.compatibility.driver_title")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(doubaoDriverStatusKey)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        Button("audio.compatibility.driver_install") {
+                            model.installDoubaoDriver()
+                        }
+                        .compatibilityButtonStyle(.standard)
+                        .disabled(
+                            model.isDoubaoDriverOperationRunning ||
+                            !DoubaoDriverInstallPolicy.canInstall(
+                                state: model.doubaoDriverState,
+                                sourceAvailable: DoubaoDriverManager.sourceURL() != nil
+                            )
+                        )
+                        Button("audio.compatibility.driver_uninstall") {
+                            model.uninstallDoubaoDriver()
+                        }
+                        .compatibilityButtonStyle(.standard)
+                        .disabled(
+                            model.isDoubaoDriverOperationRunning ||
+                            !DoubaoDriverInstallPolicy.canUninstall(state: model.doubaoDriverState)
+                        )
+                    }
+                }
+
+                if model.isDoubaoDriverOperationRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if model.doubaoDriverOperationFailed {
+                    Text("audio.compatibility.driver_operation_failed")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red)
+                }
+
                 Text("audio.compatibility.help_plain")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var doubaoDriverIsInstalled: Bool {
+        if case .installed = model.doubaoDriverState { return true }
+        return false
+    }
+
+    private var doubaoDriverStatusKey: LocalizedStringKey {
+        switch model.doubaoDriverState {
+        case .installed:
+            return "audio.compatibility.driver_installed"
+        case .notInstalled:
+            return DoubaoDriverManager.sourceURL() == nil
+                ? "audio.compatibility.driver_not_available"
+                : "audio.compatibility.driver_not_installed"
+        case .invalid:
+            return "audio.compatibility.driver_invalid"
         }
     }
 

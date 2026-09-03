@@ -1,7 +1,7 @@
 # Siri Remote 后端集成 — 测试手册
 
 > 适用分支：`self-contained-base`（v1.8.5 时代基线 + Siri Remote 集成改动）
-> 版本：1.1（2026-08-20）
+> 版本：1.3（2026-09-03）
 > 说明：本手册覆盖 Siri Remote 后端的自动化验证边界与真机验收用例。
 > **真机用例尚未执行**——需要第三代 Apple TV Siri Remote（USB-C）硬件。
 
@@ -10,6 +10,8 @@
 - 设置页"连接设备"选择：Apple Siri Remote（第三代·USB-C）/ 小米蓝牙遥控器 2 Pro
 - Siri Remote 按键 → 统一事件 → 现有单击/双击/长按/快捷键/打开 App 全部可用
 - Siri Remote 语音键 → Opus 解码 → 48 kHz → Fn 点按/虚拟麦克风共用会话链路
+- 原生捕获和内置降级同时写入参考项目兼容的 POSIX 共享内存环；未安装系统 HAL 时仍使用现有
+  `VirtualAudioOutput`，不会自动修改系统默认输入设备。
 - Siri Remote 专用平铺映射页（语音键固定，其他按键均支持单击/双击/长按）
 - 小米遥控器功能零回归（链路不共享改动）
 
@@ -24,7 +26,7 @@
 
 | 用例 | 命令 | 结果 |
 |---|---|---|
-| 全部单元测试 | `swift test` | ✅ 247/247 通过 |
+| 全部单元测试 | `swift test` | ✅ 301/301 通过 |
 | 构建 | `swift build` | ✅ 0 error |
 
 新增自动化覆盖：
@@ -38,6 +40,46 @@
 - 本地化：语义 key 完整、无受限技术术语
 
 ## 真机验收用例
+
+### U3-Native 原生 macOS 语音捕获
+
+该路径用于 macOS 不转发 Direct HID `0xFA` 音频报告的机器。它不会把遥控器注册成标准
+Bluetooth Audio，而是读取系统 HCI 抓包中的 GATT 语音通知，再复用 App 当前的 Opus 和虚拟
+音频输出；如果 PacketLogger、管理员权限或 HCI 捕获不可用，App 会自动保留 Direct HID
+路径，不会阻断普通按键和已可达的语音输入。
+
+测试前准备：
+
+1. 从 Apple Additional Tools 安装 `PacketLogger.app`，确认其内置
+   `Contents/Resources/packetlogger` 可执行。
+2. 启动 RemoteMic，选择 Apple Siri Remote；在连接面板点击“启用原生捕获”，按系统提示
+   授权。该操作会重启 `bluetoothd` 并短暂断开蓝牙设备；首次启动捕获进程时，App 还会
+   请求一次管理员授权以启动 PacketLogger。若 App 无法启动，可在终端执行
+   `scripts/enable-siri-remote-native-mic.sh enable` 作为诊断回退。
+3. 首次使用会请求麦克风权限；允许后，设置页应显示“内置麦克风降级已运行”。它只在遥控器
+   语音空闲时向已选择的虚拟麦克风送入内置麦克风，不修改系统默认输入。
+4. 目标 App 选择 RemoteMic 虚拟麦克风。若使用豆包等只识别兼容设备的工具，在“语音输入与兼容”中
+   可直接安装或卸载 `MiRemoteV 2ch`；安装前会拒绝覆盖已有驱动，卸载前会核对 Bundle ID。
+5. 设置页必须显示 PacketLogger 可用性；缺少时可以直接打开中英文原生语音设置说明。关闭设置后重新
+   打开页面，状态应重新探测，不能继续显示过期的“可用”。
+
+操作与预期：
+
+1. 保持 RemoteMic 运行，按住 Siri 键说话 3 秒后松开。
+2. 预期日志包含 `native mic capture started`，随后语音会话停止时
+   `samples` 大于 0，目标 App 能收到连续语音。
+3. 松开 Siri 后，预期虚拟麦克风切回内置麦克风；若设置页显示麦克风权限不足或日志出现
+   `builtin fallback unavailable`，判定降级失败，但不能判定 Direct HID 按键失败。
+   如果按住 Siri 后 350 ms 内仍没有任何遥控器 PCM，日志应出现 `voice fallback_started`，
+   会话继续使用内置麦克风；遥控器 PCM 恢复后应出现 `voice fallback_replaced` 并立即切回遥控器。
+4. 失败判定：日志出现 `packetlogger_not_found`、`packetlogger_start_failed`，或语音会话
+   `samples=0`。此时保留日志和 macOS 版本，不要反复修改 `0xAF` report ID。
+5. 完成测试后执行 `scripts/enable-siri-remote-native-mic.sh disable`，确认蓝牙设备和小米
+   语音链路恢复；该脚本只删除 `HCITraces` 键，不修改其他蓝牙偏好。
+
+自动化边界：`.pklg` 记录拆分、ACL/L2CAP 重组、ATT 语音帧校验、帧序号去重、降级时序和
+共享内存 ABI 由 `SiriRemoteNativeMicCaptureTests` 覆盖；PacketLogger、真实蓝牙设备、管理员
+权限、系统 HAL 与目标 App 收音仍必须在真实 macOS 环境验收。
 
 ### U1 连接与选择
 1. 打开设置 → 连接设备，选择 Apple Siri Remote
@@ -86,8 +128,9 @@
 - **Direct HID 音频路径可行性（最高风险）**：VibeRemote 真机记录以及 2026 年仍在维护的同类工具都表明，
   macOS 可能不向普通 App 转发 0xFA 音频报告；0xAF 写入成功不等于音频可达。若 U3 失败且日志显示无 0xFA 报告：
   1. 确认 0xAF 写入结果（日志 `SIRI REMOTE 0xAF`）
-  2. 用 Apple Additional Tools 中独立安装的 PacketLogger 做诊断，不把 Apple 工具或管理员命令打包进 App
-  3. 后续计划 B：隔离的 PacketLogger 捕获组件（需要单独的权限、安装、卸载和安全评审；尚未实现）
+  2. 用 Apple Additional Tools 中独立安装的 PacketLogger 做诊断；App 设置页也可显式启用/关闭
+     HCI 捕获，首次启动 PacketLogger 会请求管理员授权。
+  3. 若原生捕获失败，继续使用 Direct HID；只有检测到原生音频帧后才抑制重复的 Direct HID 音频。
 - 触摸板手势：未实现（macOS 无法获取触摸坐标），接口已预留
 - 电量显示：已实现 HID `BatteryLevel`/`BatteryPercent` 快速路径与 CoreBluetooth 标准 Battery Service（180F/2A19）兜底；不会断开系统已持有的 BLE HID 链路，5 分钟刷新一次。实际取值待真机确认
 - Watch 功能：不在本基线（源码位于不可访问的私有仓库）

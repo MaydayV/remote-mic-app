@@ -138,6 +138,7 @@ export EXPECTED_DEVELOPER_TEAM_ID
 export REQUIRE_DEVELOPER_ID_SIGNING=1
 export REQUIRE_NOTARIZATION=0
 
+"$ROOT/scripts/build-doubao-driver.sh"
 "$ROOT/scripts/build-app.sh"
 "$ROOT/scripts/verify-app.sh" "$APP"
 
@@ -146,7 +147,6 @@ notarize "$APP_NOTARY_ZIP"
 staple_and_validate "$APP"
 REQUIRE_NOTARIZATION=1 "$ROOT/scripts/verify-app.sh" "$APP"
 
-"$ROOT/scripts/build-doubao-driver.sh"
 "$ROOT/scripts/build-doubao-driver-pkg.sh"
 
 if [[ "$PARALLEL_PACKAGE_NOTARIZATION" == "1" ]]; then

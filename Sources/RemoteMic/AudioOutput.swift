@@ -31,6 +31,12 @@ enum CoreAudioDeviceCatalog {
         }
     }
 
+    static func builtInInputDevice() -> AudioDeviceInfo? {
+        withPropertyLock {
+            inputDevices().first { transportType(for: $0.id) == kAudioDeviceTransportTypeBuiltIn }
+        }
+    }
+
     private static func devicesLocked(scope: AudioObjectPropertyScope) -> [AudioDeviceInfo] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,

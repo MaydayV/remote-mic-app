@@ -45,8 +45,8 @@ trap cleanup EXIT
 mkdir -p "$STAGING"
 
 if [[ "$BUILD_COMPONENTS" == "1" ]]; then
-  "$ROOT/scripts/build-app.sh"
   "$ROOT/scripts/build-doubao-driver.sh"
+  "$ROOT/scripts/build-app.sh"
   "$ROOT/scripts/build-doubao-driver-pkg.sh"
 else
   "$ROOT/scripts/verify-app.sh" "$APP_DIR"

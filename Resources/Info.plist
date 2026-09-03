@@ -28,6 +28,8 @@
     <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Connect to the Xiaomi Bluetooth Remote 2 Pro to receive button and voice data.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Use the Mac microphone as a fallback input when Siri Remote voice capture is idle.</string>
     <key>NSHumanReadableCopyright</key>
     <string>GPL-3.0-only</string>
     <key>NSPrincipalClass</key>

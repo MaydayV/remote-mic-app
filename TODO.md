@@ -1,5 +1,7 @@
 # TODO
 
+- [x] 原生 Siri Remote 语音设置闭环：设置页显示 PacketLogger 可用性，提供中英文安装说明；内置麦克风降级的采样率转换器按音频回调生命周期安全持有，避免权限/设备切换时的线程竞态；遥控器 PCM 暂时中断时，语音会话在 350ms 后自动使用内置麦克风，恢复后无缝切回。仍需真实 macOS 与 Siri Remote 验收。
+
 - [ ] 使用 Cloudflare CDN 加速 Mac 下载
   - 官网固定入口为 `https://download.sayall.app/mac`，只解析 GitHub 最新正式版并跳转到同域名的版本化 DMG，不把 Pre-release 作为默认下载。
   - Sparkle 只使用 GitHub 稳定 feed，版本化 ZIP 与本地化更新说明改走 `download.sayall.app/mac/releases/<tag>/`；旧安装用户无需迁移 feed。
@@ -122,6 +124,7 @@
 - [x] ~~配置导入导出~~（已完成：支持版本化 JSON 导入导出全部个性化设置；本地使用统计不随配置迁移）
 - [ ] 兼容 Typeless 等点按切换式语音输入
   - 默认关闭的“语音键模拟 Fn 点按”模式把按下和松开转换为两次 Fn 点按，同时保留 RC003 必须物理按住才能采音的硬件行为；这不是持续录音或独立语音输入。
+  - 语音触发键现支持 Fn/地球键、左 Command、右 Command 与右 Option 长按；后三种修饰键模式需要辅助功能权限，右 Option 作为低冲突的专用触发键。目标语音工具必须配置相同按键，默认 Fn 行为保持兼容。
   - 功能入口位于“按键映射”页遥控器下方，与语音键的固定按住说话行为放在一起说明；连接页不再重复展示该设置。
   - 已完成辅助功能权限门、全目标 HID neutralize 与失败回滚、generation 会话状态、开头 pre-roll、结尾排空、配置兼容及自动化测试；新增跨组件首次语音门禁，覆盖目标延迟 0～3 秒、5 秒缓存、提前松开、超时、目标切换、敏感字段以及 RC001/RC003 模拟 `STREAM_START → AUDIO → STREAM_STOP`，不再把第三次成功视为通过。待实体遥控器复验默认豆包路径、Typeless 路径、录音中关闭开关、断连恢复和唤起目标后的第一次文字上屏，再标记完成。
   - `1.7.6` 预览版已因 macOS 26 启动阶段的 HID 服务生命周期崩溃撤回；修复后服务对象会在映射读取和写入期间持续持有所属 HID 客户端，并由生命周期回归测试覆盖。`1.7.7` 已在 RC003 连接和代表性持久化设置下通过最终 ZIP App 的首次启动、正常退出、二次启动、四种功能状态及无新增崩溃报告门禁；PKG 内嵌 App 与已启动验证的 App 完全一致，已发布为 Pre-release。Typeless 等实验路径仍按本条后续真机范围继续验证。
@@ -204,7 +207,9 @@
   - SiriRemoteForge 集成评估、候选项目源码与 Release 对比，以及暂停的 Apple Remote Windows 路线研究均已迁移至独立的产品资料工作区。
   - 2026-08-19 基于 VibeRemote 协议数据（0xAF input-enable、0xFB 按键 usage、0xFA 99-byte Opus CELT 48kHz）实现 Siri Remote（第三代 USB-C）后端：`RemoteBackend` 统一协议、`SiriRemoteBackend`（HID 发现/0xAF/按键映射）、`OpusDecoder`（系统 AudioToolbox，无第三方依赖）、虚拟麦克风 48kHz 动态采样率；设置页新增“连接设备”选择（Apple Siri Remote / 小米遥控器 2 Pro），小米链路保持原实现。
   - 待真机验收：按键映射（U2）、语音链路（U3）、双后端共存（U5）及小米回归（U4），见 `Testing/SiriRemoteIntegration.md`；已知风险：macOS 可能阻断 Direct HID 0xFA 音频交付（VibeRemote 记载），若真机确认则转 PacketLogger 方案。
-  - 2026-08-20 完成开发复核与补强：持久化选择会在重启后启动 Siri 后端；系统关键 HID 集合改为共享打开并补齐匹配页、移除/退出安全清理和 registry stale watchdog；Siri 语音纳入 Fn 会话、统计及虚拟音频生命周期，修复 48 kHz → 小米 16 kHz 切回时三倍速及预滚混采样率问题，并拒绝非当前后端的并发语音流；设置页补齐 Siri Remote 平铺映射及独立连接状态面板；电量增加标准 BLE Battery Service（180F/2A19）兜底且不主动断开系统 HID 链路。自动化 247 项全绿；Direct HID 0xFA 音频与 BLE 电量仍待真机确认。
+  - 2026-08-20 完成开发复核与补强：持久化选择会在重启后启动 Siri 后端；系统关键 HID 集合改为共享打开并补齐匹配页、移除/退出安全清理和 registry stale watchdog；Siri 语音纳入 Fn 会话、统计及虚拟音频生命周期，修复 48 kHz → 小米 16 kHz 切回时三倍速及预滚混采样率问题，并拒绝非当前后端的并发语音流；设置页补齐 Siri Remote 平铺映射及独立连接状态面板；电量增加标准 BLE Battery Service（180F/2A19）兜底且不主动断开系统 HID 链路。历史自动化 247 项全绿；Direct HID 0xFA 音频与 BLE 电量仍待真机确认。
+  - 2026-09-02 开始移植原生 macOS 语音路径：新增 PacketLogger `.pklg` 增量读取、HCI ACL/L2CAP 重组、ATT `0x1B` 语音通知解析、管理员捕获进程、60ms 抖动缓冲和丢帧静音补偿，并接入现有 Opus/虚拟音频回调；设置页提供 HCI 开关和捕获进程状态，`scripts/enable-siri-remote-native-mic.sh` 保留为显式、可逆的命令行回退。当前仍需第三代 Siri Remote 真机验证、PacketLogger Additional Tools 安装和系统级虚拟麦克风长期稳定性验收，未标记 Apple 语音支持完成。
+  - 2026-09-02 原生语音增加降级和驱动可恢复操作：PacketLogger、管理员授权或 HCI 捕获失败时保留 Direct HID，不阻断按键链路；原生语音空闲时可将内置麦克风送入已选择的虚拟麦克风；设置页可检查、安装和卸载 MiRemoteV 2ch 兼容 HAL 驱动，安装拒绝覆盖、卸载核对 Bundle ID；同步填充参考 HAL 使用的两条 POSIX 共享内存环。自动化 301/301 通过；驱动和原生语音仍需真实 macOS、PacketLogger 与 Siri Remote 验收。
 - [ ] 支持 Xiaomi Bluetooth Remote Control 2（RC001-MS）
   - 已通过真机确认 RC001-MS 可以连接 Mac，除语音键之外的普通按键能够被现有 App 或 macOS 识别；语音键没有普通按键事件不代表设备没有语音能力，当前未知项是 Voice GATT / HID Report、音频包格式和编码方式。
   - 实现前先记录现有 RC003-MS 的服务、Characteristic、控制包、音频包和解码基线，再为 RC001-MS 增加只用于诊断的完整 Service Discovery、Notify / Indicate 订阅和受控数据日志；不得根据同系列型号猜测 UUID 或直接复制 RC003 常量。

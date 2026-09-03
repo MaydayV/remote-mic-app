@@ -46,6 +46,21 @@ enum HIDMappingRecoveryPolicy {
     }
 }
 
+enum SiriRemoteVoiceFallbackPolicy {
+    static let initialGracePeriod: TimeInterval = 0.35
+    static let remoteFreshWindow: TimeInterval = 0.30
+
+    static func shouldUseBuiltin(
+        now: Date,
+        voiceStartedAt: Date,
+        lastRemoteAudioAt: Date?
+    ) -> Bool {
+        guard now.timeIntervalSince(voiceStartedAt) >= initialGracePeriod else { return false }
+        guard let lastRemoteAudioAt else { return true }
+        return now.timeIntervalSince(lastRemoteAudioAt) >= remoteFreshWindow
+    }
+}
+
 /// The onboarding view only needs to know that audio has arrived once per voice session.
 /// Keeping the monotonically increasing sample counter for diagnostics while publishing this
 /// edge-triggered receipt avoids invalidating the whole SwiftUI tree for every audio packet.
@@ -68,6 +83,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var hidStatus = LocalizedMessage("button_mapping.status.disabled")
     @Published private(set) var audioStatus = LocalizedMessage("audio.output.none_selected")
     @Published private(set) var doubaoAudioStatus = LocalizedMessage("audio.compatibility.checking")
+    @Published private(set) var doubaoDriverState: DoubaoDriverState = .notInstalled
+    @Published private(set) var isDoubaoDriverOperationRunning = false
+    @Published private(set) var doubaoDriverOperationFailed = false
     @Published private(set) var isStreaming = false
     @Published private(set) var isMouseModeActive = false
     @Published private(set) var isConnected = false
@@ -100,6 +118,16 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     @Published private(set) var siriRemoteBatteryLevel: Int?
     /// Siri Remote 是否已连接（后端检测到遥控器 HID 设备）
     @Published private(set) var isSiriRemoteConnected = false
+    /// 原生 Siri 语音捕获的系统 HCI 调试开关状态。
+    @Published private(set) var isSiriRemoteNativeMicConfigured = false
+    @Published private(set) var isSiriRemotePacketLoggerAvailable = false
+    @Published private(set) var isSiriRemoteNativeMicCaptureRunning = false
+    @Published private(set) var isSiriRemoteBuiltinMicFallbackRunning = false
+    @Published private(set) var isSiriRemoteNativeMicSetupRunning = false
+    @Published private(set) var siriRemoteNativeMicSetupFailed = false
+    private var siriRemoteVoiceStartedAt: Date?
+    private var siriRemoteLastAudioAt: Date?
+    private var siriRemoteUsingBuiltinMicFallbackForVoice = false
     private let voiceFunctionMapper = RemoteVoiceFunctionMapper()
     private lazy var mouseModeController: MouseModeController = {
         let controller = MouseModeController()
@@ -218,9 +246,53 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         activeBackendKind = RemoteBackendKind(rawValue: settings.activeBackendKindRawValue)
             ?? .xiaomi
         audioDevices = initialAudioDevices
+        doubaoDriverState = DoubaoDriverManager.currentState()
+        let nativeAvailability = SiriRemoteNativeMicCapture.availability()
+        isSiriRemoteNativeMicConfigured = nativeAvailability.traceConfigured
+        isSiriRemotePacketLoggerAvailable = nativeAvailability.packetLoggerAvailable
         audioOutput.onConfigurationChange = { [weak self] in
             self?.scheduleAudioRecovery(reason: "engine_configuration_change")
         }
+    }
+
+    func setSiriRemoteNativeMicConfigured(_ enabled: Bool) {
+        guard !isSiriRemoteNativeMicSetupRunning else { return }
+        isSiriRemoteNativeMicSetupRunning = true
+        siriRemoteNativeMicSetupFailed = false
+        AppLogger.shared.write("SIRI REMOTE native mic setup requested enabled=\(enabled)")
+        SiriRemoteNativeMicSetup.setEnabled(enabled) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isSiriRemoteNativeMicSetupRunning = false
+                switch result {
+                case .success:
+                    self.refreshSiriRemoteNativeMicAvailability()
+                    MainActor.assumeIsolated {
+                        self.siriRemoteBackend.refreshNativeMicCapture()
+                    }
+                    AppLogger.shared.write("SIRI REMOTE native mic setup finished enabled=\(enabled)")
+                case .failure(let error):
+                    self.siriRemoteNativeMicSetupFailed = true
+                    AppLogger.shared.write(
+                        "SIRI REMOTE native mic setup failed enabled=\(enabled) error=\(error.localizedDescription)"
+                    )
+                }
+            }
+        }
+    }
+
+    func refreshSiriRemoteNativeMicAvailability() {
+        let availability = SiriRemoteNativeMicCapture.availability()
+        isSiriRemoteNativeMicConfigured = availability.traceConfigured
+        isSiriRemotePacketLoggerAvailable = availability.packetLoggerAvailable
+    }
+
+    func openSiriRemoteNativeMicGuide(using localization: LocalizationStore) {
+        guard let instructions = localization.localizedURL(
+            forResource: "SiriRemoteNativeMic",
+            withExtension: "md"
+        ) else { return }
+        NSWorkspace.shared.open(instructions)
     }
 
     func startIfNeeded() {
@@ -478,6 +550,70 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private func publishAudioDevices(_ devices: [AudioDeviceInfo]) {
         audioDevices = devices
         doubaoAudioStatus = DoubaoAudioDevicePolicy.status(in: devices)
+        doubaoDriverState = DoubaoDriverManager.currentState()
+    }
+
+    func refreshDoubaoDriverState() {
+        doubaoDriverState = DoubaoDriverManager.currentState()
+    }
+
+    func installDoubaoDriver() {
+        guard !isDoubaoDriverOperationRunning else { return }
+        refreshDoubaoDriverState()
+        guard DoubaoDriverInstallPolicy.canInstall(
+            state: doubaoDriverState,
+            sourceAvailable: DoubaoDriverManager.sourceURL() != nil
+        ) else {
+            doubaoDriverOperationFailed = true
+            return
+        }
+        isDoubaoDriverOperationRunning = true
+        doubaoDriverOperationFailed = false
+        AppLogger.shared.write("AUDIO DRIVER install_requested")
+        DoubaoDriverManager.install { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isDoubaoDriverOperationRunning = false
+                switch result {
+                case .success:
+                    self.refreshDoubaoDriverState()
+                    self.refreshAudioDevices()
+                    AppLogger.shared.write("AUDIO DRIVER install_finished state=\(self.doubaoDriverState)")
+                case .failure(let error):
+                    self.doubaoDriverOperationFailed = true
+                    self.refreshDoubaoDriverState()
+                    AppLogger.shared.write("AUDIO DRIVER install_failed error=\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    func uninstallDoubaoDriver() {
+        guard !isDoubaoDriverOperationRunning else { return }
+        refreshDoubaoDriverState()
+        guard DoubaoDriverInstallPolicy.canUninstall(state: doubaoDriverState) else {
+            doubaoDriverOperationFailed = true
+            return
+        }
+        isDoubaoDriverOperationRunning = true
+        doubaoDriverOperationFailed = false
+        AppLogger.shared.write("AUDIO DRIVER uninstall_requested")
+        DoubaoDriverManager.uninstall { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isDoubaoDriverOperationRunning = false
+                switch result {
+                case .success:
+                    self.refreshDoubaoDriverState()
+                    self.refreshAudioDevices()
+                    AppLogger.shared.write("AUDIO DRIVER uninstall_finished state=\(self.doubaoDriverState)")
+                case .failure(let error):
+                    self.doubaoDriverOperationFailed = true
+                    self.refreshDoubaoDriverState()
+                    AppLogger.shared.write("AUDIO DRIVER uninstall_failed error=\(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     private static func audioDevicesDiagnostic(_ devices: [AudioDeviceInfo]) -> String {
@@ -1255,6 +1391,21 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                     self?.handleSiriRemoteConnectionChange(connected)
                 }
             }
+            siriRemoteBackend.onNativeMicCaptureStateChange = { [weak self] running in
+                DispatchQueue.main.async {
+                    self?.isSiriRemoteNativeMicCaptureRunning = running
+                }
+            }
+            siriRemoteBackend.onBuiltinMicFallbackSamples = { [weak self] samples, sampleRate in
+                DispatchQueue.main.async {
+                    self?.receiveSiriRemoteBuiltinMicFallback(samples, sampleRate: sampleRate)
+                }
+            }
+            siriRemoteBackend.onBuiltinMicFallbackStateChange = { [weak self] running in
+                DispatchQueue.main.async {
+                    self?.isSiriRemoteBuiltinMicFallbackRunning = running
+                }
+            }
             siriRemoteBackend.onVoiceStreamEnded = { [weak self] in
                 DispatchQueue.main.async {
                     self?.finishSiriRemoteVoice(reason: "remote_stream_ended")
@@ -1334,7 +1485,14 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             AppLogger.shared.write("SIRI REMOTE voice rejected reason=audio_unavailable")
             return
         }
+        // Drop any queued built-in-mic fallback frames so the remote voice
+        // starts immediately instead of playing behind stale fallback audio.
+        audioOutput.endSession()
+        karaokeAudioOutput.endSession()
         siriRemoteVoiceActive = true
+        siriRemoteVoiceStartedAt = Date()
+        siriRemoteLastAudioAt = nil
+        siriRemoteUsingBuiltinMicFallbackForVoice = false
         currentVoiceSampleCount = 0
         hasReceivedCurrentVoiceSamples = false
         voiceFnTapSession.resume()
@@ -1346,6 +1504,15 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
 
     private func receiveSiriRemoteAudio(_ samples: [Float], sampleRate: Double) {
         guard siriRemoteVoiceActive, !samples.isEmpty else { return }
+        siriRemoteLastAudioAt = Date()
+        if siriRemoteUsingBuiltinMicFallbackForVoice {
+            // A delayed native/direct frame is authoritative. Drop any fallback
+            // buffers queued during the grace window so speech starts at once.
+            audioOutput.endSession()
+            karaokeAudioOutput.endSession()
+            siriRemoteUsingBuiltinMicFallbackForVoice = false
+            AppLogger.shared.write("SIRI REMOTE voice fallback_replaced source=remote")
+        }
         let int16Samples = samples.map { sample -> Int16 in
             let scaled = max(-1, min(1, sample)) * Float(Int16.max)
             return Int16(scaled.rounded())
@@ -1362,9 +1529,37 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
     }
 
+    private func receiveSiriRemoteBuiltinMicFallback(_ samples: [Float], sampleRate: Double) {
+        guard activeBackendKind == .siriRemote,
+              !samples.isEmpty,
+              isAudioOutputReady
+        else { return }
+        if siriRemoteVoiceActive {
+            let now = Date()
+            // Give the native HCI/Direct HID paths a short head start. If
+            // neither produces audio, keep the voice session usable with the
+            // physical Mac microphone until the remote stream recovers.
+            guard let voiceStartedAt = siriRemoteVoiceStartedAt,
+                  SiriRemoteVoiceFallbackPolicy.shouldUseBuiltin(
+                    now: now,
+                    voiceStartedAt: voiceStartedAt,
+                    lastRemoteAudioAt: siriRemoteLastAudioAt
+                  )
+            else { return }
+            if !siriRemoteUsingBuiltinMicFallbackForVoice {
+                siriRemoteUsingBuiltinMicFallbackForVoice = true
+                AppLogger.shared.write("SIRI REMOTE voice fallback_started source=builtin")
+            }
+        }
+        _ = enqueueVoiceAudio(samples: samples, sampleRate: sampleRate)
+    }
+
     private func finishSiriRemoteVoice(reason: String) {
         guard siriRemoteVoiceActive else { return }
         siriRemoteVoiceActive = false
+        siriRemoteVoiceStartedAt = nil
+        siriRemoteLastAudioAt = nil
+        siriRemoteUsingBuiltinMicFallbackForVoice = false
         updateVoiceKeyState(streaming: false)
         _ = voiceFnTapSession.stopVoice()
         endVoiceSessionIfNeeded(flushAudio: false)
@@ -2046,7 +2241,8 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     }
 
     private var hasActiveVirtualAudioSource: Bool {
-        bluetoothVoiceActive || isPlayingTestTone || siriRemoteVoiceActive
+        bluetoothVoiceActive || isPlayingTestTone || siriRemoteVoiceActive ||
+            isSiriRemoteBuiltinMicFallbackRunning
     }
 
     private func scheduleOnDemandVirtualAudioRelease(reason: String) {

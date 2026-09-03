@@ -92,6 +92,20 @@ struct SettingsPageRegressionTests {
         #expect(settingsSource.contains("Image(systemName: icon)"))
     }
 
+    @Test func compatibilityDriverHasInlineInstallAndUninstallControls() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let settingsSource = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/SettingsView.swift"),
+            encoding: .utf8
+        )
+        #expect(settingsSource.contains("model.installDoubaoDriver()"))
+        #expect(settingsSource.contains("model.uninstallDoubaoDriver()"))
+        #expect(settingsSource.contains("driver_operation_failed"))
+    }
+
     @Test func mappingSelectionStaysOnTheEditedButtonWhileLocked() {
         #expect(MappingSelectionPolicy.selection(
             current: .home,

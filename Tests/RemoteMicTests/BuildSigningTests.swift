@@ -34,6 +34,29 @@ struct BuildSigningTests {
             ).last
         )
         #expect(!adHocSigningSource.contains("--options runtime"))
+        #expect(source.contains("MiRemoteV2ch.driver"))
+        #expect(source.contains("$OUTPUT_DIR/MiRemoteV2ch.driver"))
+    }
+
+    @Test func releaseBuildsDriverBeforeEmbeddingItInTheApp() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let dmgSource = try String(
+            contentsOf: root.appendingPathComponent("scripts/build-dmg.sh"),
+            encoding: .utf8
+        )
+        let notarizeSource = try String(
+            contentsOf: root.appendingPathComponent("scripts/notarize-release.sh"),
+            encoding: .utf8
+        )
+        let dmgDriver = try #require(dmgSource.range(of: "build-doubao-driver.sh"))
+        let dmgApp = try #require(dmgSource.range(of: "build-app.sh"))
+        let notarizeDriver = try #require(notarizeSource.range(of: "build-doubao-driver.sh"))
+        let notarizeApp = try #require(notarizeSource.range(of: "build-app.sh"))
+        #expect(dmgDriver.lowerBound < dmgApp.lowerBound)
+        #expect(notarizeDriver.lowerBound < notarizeApp.lowerBound)
     }
 
     @Test func productionReleaseDoesNotRequirePrivateFeaturePackage() throws {
