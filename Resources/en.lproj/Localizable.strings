@@ -350,6 +350,7 @@
 "statistics.metric.button_count" = "Button Presses";
 "statistics.metric.voice_duration" = "Voice Duration";
 "statistics.metric.week_button_count" = "This Week's Presses";
+"statistics.calendar.title" = "Activity Calendar";
 "statistics.period.today" = "Day";
 "statistics.period.this_week" = "Week";
 "statistics.period.total" = "All";
