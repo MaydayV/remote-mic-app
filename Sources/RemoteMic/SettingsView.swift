@@ -569,6 +569,18 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                HStack(spacing: 8) {
+                    Button("remote.backend.siri_packetlogger_download") {
+                        model.openPacketLoggerDownloadPage()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button("remote.backend.siri_packetlogger_refresh") {
+                        model.refreshSiriRemoteNativeMicAvailability()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
         }
         .padding(10)

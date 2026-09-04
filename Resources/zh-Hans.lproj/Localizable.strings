@@ -568,6 +568,8 @@
 "remote.backend.siri_native_setup_failed" = "设置失败或已取消授权，请重试或使用测试手册中的脚本。";
 "remote.backend.siri_packetlogger_missing" = "未找到 PacketLogger。请安装 Apple Additional Tools 后重新启动 Remote Mic；按键可用并不代表 Siri 语音已被捕获。";
 "remote.backend.siri_packetlogger_guide" = "打开原生语音设置说明";
+"remote.backend.siri_packetlogger_download" = "获取 Additional Tools";
+"remote.backend.siri_packetlogger_refresh" = "重新检测";
 "remote.backend.siri_connected" = "已连接";
 "remote.backend.siri_disconnected" = "未连接";
 "remote.backend.siri_mapping_title" = "Siri Remote 按键映射";

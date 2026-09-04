@@ -295,6 +295,13 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         NSWorkspace.shared.open(instructions)
     }
 
+    func openPacketLoggerDownloadPage() {
+        guard let url = URL(string: "https://developer.apple.com/download/all/?q=Additional%20Tools%20for%20Xcode") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
     func startIfNeeded() {
         guard !started else { return }
         started = true

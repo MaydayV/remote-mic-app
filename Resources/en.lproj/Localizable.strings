@@ -568,6 +568,8 @@
 "remote.backend.siri_native_setup_failed" = "Setup failed or authorization was cancelled. Retry or use the test-guide script.";
 "remote.backend.siri_packetlogger_missing" = "PacketLogger was not found. Install Apple's Additional Tools, then restart Remote Mic; buttons can work even when Siri audio cannot be captured.";
 "remote.backend.siri_packetlogger_guide" = "Open native voice setup guide";
+"remote.backend.siri_packetlogger_download" = "Get Additional Tools";
+"remote.backend.siri_packetlogger_refresh" = "Check Again";
 "remote.backend.siri_connected" = "Connected";
 "remote.backend.siri_disconnected" = "Not connected";
 "remote.backend.siri_mapping_title" = "Siri Remote button mapping";

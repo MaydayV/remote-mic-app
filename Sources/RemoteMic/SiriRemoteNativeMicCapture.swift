@@ -412,13 +412,39 @@ final class SiriRemoteNativeMicCapture {
 
     /// Locate Apple's PacketLogger binary from Additional Tools or a PATH install.
     static func packetLoggerURL() -> URL? {
-        let candidates = [
+        let fileManager = FileManager.default
+        let packetLoggerRelativePath = [
+            "PacketLogger.app/Contents/Resources/packetlogger"
+        ]
+        var candidates = [
             "/Applications/PacketLogger.app/Contents/Resources/packetlogger",
             "/Applications/Additional Tools/PacketLogger.app/Contents/Resources/packetlogger",
             "/Applications/Additional Tools for Xcode/PacketLogger.app/Contents/Resources/packetlogger",
             "/Volumes/Additional Tools/Hardware/PacketLogger.app/Contents/Resources/packetlogger",
         ]
-        let fileManager = FileManager.default
+        let home = fileManager.homeDirectoryForCurrentUser
+        for root in [
+            home.appendingPathComponent("Applications"),
+            home.appendingPathComponent("Downloads"),
+            home.appendingPathComponent("Desktop")
+        ] {
+            candidates += packetLoggerRelativePath.map {
+                root.appendingPathComponent($0).path
+            }
+            for name in ["Additional Tools", "Additional Tools for Xcode"] {
+                let toolsRoot = root.appendingPathComponent(name)
+                candidates.append(
+                    toolsRoot
+                        .appendingPathComponent("Hardware/PacketLogger.app/Contents/Resources/packetlogger")
+                        .path
+                )
+                candidates.append(
+                    toolsRoot
+                        .appendingPathComponent("PacketLogger.app/Contents/Resources/packetlogger")
+                        .path
+                )
+            }
+        }
         if let path = candidates.first(where: { fileManager.isExecutableFile(atPath: $0) }) {
             return URL(fileURLWithPath: path)
         }
