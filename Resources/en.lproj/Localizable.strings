@@ -349,6 +349,7 @@
 "statistics.summary.description" = "See daily or weekly trends, or only the all-time totals.";
 "statistics.metric.button_count" = "Button Presses";
 "statistics.metric.voice_duration" = "Voice Duration";
+"statistics.metric.week_button_count" = "This Week's Presses";
 "statistics.period.today" = "Day";
 "statistics.period.this_week" = "Week";
 "statistics.period.total" = "All";

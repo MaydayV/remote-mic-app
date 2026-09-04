@@ -349,6 +349,7 @@
 "statistics.summary.description" = "按日、按周查看趋势，或只查看全部累计数据。";
 "statistics.metric.button_count" = "按键次数";
 "statistics.metric.voice_duration" = "语音时长";
+"statistics.metric.week_button_count" = "本周按键次数";
 "statistics.period.today" = "日";
 "statistics.period.this_week" = "周";
 "statistics.period.total" = "全部";
