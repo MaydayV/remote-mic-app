@@ -1,5 +1,10 @@
 # Version History
 
+## 1.8.40 (Preview)
+
+- Added an optional Launch at Login setting that starts Remote Mic automatically after signing in to macOS, with clear handling when macOS requires approval.
+- Added a dedicated Focus Input Field action and improved automatic input focus for search fields, Settings, and Terminal while continuing to reject sensitive fields.
+
 ## 1.8.12 (Pre-release)
 
 - Improved the speed and reliability of Mac installer and automatic-update downloads. Existing versions can continue checking for updates, with GitHub downloads retained as a fallback.
