@@ -107,6 +107,10 @@ if [[ -d "$OUTPUT_DIR/MiRemoteV2ch.driver" ]]; then
   ditto --norsrc --noextattr --noqtn --noacl \
     "$OUTPUT_DIR/MiRemoteV2ch.driver" \
     "$APP_DIR/Contents/Resources/MiRemoteV2ch.driver"
+  # The upstream driver README contains a sample /Users/user/Library path.
+  # Keep the runtime driver payload minimal and avoid shipping that example
+  # path into the signed App bundle's privacy-path scan.
+  rm -f "$APP_DIR/Contents/Resources/MiRemoteV2ch.driver/Contents/Resources/README.md"
 fi
 for icon_resource in \
   AppIcon.icns \

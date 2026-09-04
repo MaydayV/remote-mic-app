@@ -36,6 +36,8 @@ struct BuildSigningTests {
         #expect(!adHocSigningSource.contains("--options runtime"))
         #expect(source.contains("MiRemoteV2ch.driver"))
         #expect(source.contains("$OUTPUT_DIR/MiRemoteV2ch.driver"))
+        #expect(source.contains("Contents/Resources/README.md"))
+        #expect(source.contains("rm -f \"$APP_DIR/Contents/Resources/MiRemoteV2ch.driver/Contents/Resources/README.md\""))
     }
 
     @Test func releaseBuildsDriverBeforeEmbeddingItInTheApp() throws {
