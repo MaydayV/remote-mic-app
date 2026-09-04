@@ -122,6 +122,7 @@
 "action.previous_command_left" = "上一首（⌘←）";
 "action.next_command_right" = "下一首（⌘→）";
 "action.custom_shortcut" = "自定义快捷键";
+"action.focus_input" = "聚焦输入框";
 "action.open_custom_application" = "打开自定义 APP";
 "action.toggle_long_recording" = "切换持续录音";
 "action.open_remote_mic" = "打开无线麦";

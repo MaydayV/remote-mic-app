@@ -473,6 +473,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
     case previousCommandLeft
     case nextCommandRight
     case customShortcut
+    case focusInput
     case openCustomApplication
     case toggleLongRecording
     case mouseLeftClick
@@ -530,6 +531,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
         case .previousCommandLeft: return localization.text("action.previous_command_left")
         case .nextCommandRight: return localization.text("action.next_command_right")
         case .customShortcut: return localization.text("action.custom_shortcut")
+        case .focusInput: return localization.text("action.focus_input")
         case .openCustomApplication: return localization.text("action.open_custom_application")
         case .toggleLongRecording: return localization.text("action.toggle_long_recording")
         case .mouseLeftClick: return localization.text("action.mouse_left_click")
@@ -584,7 +586,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
              .playPause, .previousCommandLeft, .nextCommandRight, .toggleLongRecording,
              .mouseLeftClick, .mouseRightClick, .mouseMiddleClick:
             return .systemAndMedia
-        case .customShortcut, .openCustomApplication, .toggleMouseMode:
+        case .customShortcut, .focusInput, .openCustomApplication, .toggleMouseMode:
             return .custom
         case .openRemoteMic, .openCodex, .openClaude, .openCmux, .openWeChat, .openCursor,
              .openXcode, .openSlack, .openWeCom, .openNeteaseMusic, .openChrome, .openSafari,
@@ -596,6 +598,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
     var allowsRepeat: Bool {
         ![
             .customShortcut,
+            .focusInput,
             .openCustomApplication,
             .commandReturn,
             .shiftReturn,

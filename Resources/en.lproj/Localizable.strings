@@ -122,6 +122,7 @@
 "action.previous_command_left" = "Previous (⌘←)";
 "action.next_command_right" = "Next (⌘→)";
 "action.custom_shortcut" = "Custom Shortcut";
+"action.focus_input" = "Focus Input Field";
 "action.open_custom_application" = "Open Custom App";
 "action.toggle_long_recording" = "Toggle Continuous Recording";
 "action.open_remote_mic" = "Open Remote Mic";

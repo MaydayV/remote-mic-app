@@ -330,6 +330,7 @@ struct RemoteButtonsTests {
 
     @Test func customShortcutsNeverRepeatWhileNavigationActionsStillCan() {
         #expect(!ButtonAction.customShortcut.allowsRepeat)
+        #expect(!ButtonAction.focusInput.allowsRepeat)
         #expect(!ButtonAction.commandReturn.allowsRepeat)
         #expect(!ButtonAction.shiftReturn.allowsRepeat)
         #expect(!ButtonAction.commandCopy.allowsRepeat)
@@ -350,6 +351,32 @@ struct RemoteButtonsTests {
         #expect(ButtonAction.scrollDown.allowsRepeat)
         #expect(ButtonAction.volumeDown.allowsRepeat)
         #expect(ButtonAction.deleteBackward.allowsRepeat)
+    }
+
+    @Test func focusInputActionUsesInjectedComposerFocuser() {
+        var callbackValue: Bool?
+        #expect(KeyboardInjector.send(
+            .focusInput,
+            frontmostComposerFocuser: { completion in
+                callbackValue = true
+                completion(true)
+                return true
+            },
+            accessibilityTrusted: { true }
+        ))
+        #expect(callbackValue == true)
+
+        callbackValue = nil
+        #expect(!KeyboardInjector.send(
+            .focusInput,
+            frontmostComposerFocuser: { completion in
+                callbackValue = false
+                completion(false)
+                return false
+            },
+            accessibilityTrusted: { false }
+        ))
+        #expect(callbackValue == nil)
     }
 
     @Test func scrollActionsPostLineWheelTicksInsteadOfArrowKeys() {
@@ -1122,7 +1149,7 @@ struct RemoteButtonsTests {
         ]
 
         #expect(KeyboardInjector.bestComposerCandidateIndex(candidates, windowFrame: windowFrame) == 2)
-        #expect(KeyboardInjector.composerCandidateScore(candidates[0], windowFrame: windowFrame) == nil)
+        #expect(KeyboardInjector.composerCandidateScore(candidates[0], windowFrame: windowFrame) != nil)
         #expect(KeyboardInjector.composerCandidateScore(candidates[1], windowFrame: windowFrame) == nil)
 
         let terminal = KeyboardInjector.AccessibilityTextCandidate(
@@ -1136,7 +1163,20 @@ struct RemoteButtonsTests {
             frame: CGRect(x: 50, y: 200, width: 900, height: 500),
             enabled: true
         )
-        #expect(KeyboardInjector.composerCandidateScore(terminal, windowFrame: windowFrame) == nil)
+        #expect(KeyboardInjector.composerCandidateScore(terminal, windowFrame: windowFrame) != nil)
+
+        let settingsField = KeyboardInjector.AccessibilityTextCandidate(
+            role: "AXTextField",
+            identifier: "settings-value",
+            title: "Settings",
+            description: "Preferences",
+            help: "",
+            placeholder: "Value",
+            context: "",
+            frame: CGRect(x: 100, y: 500, width: 700, height: 36),
+            enabled: true
+        )
+        #expect(KeyboardInjector.composerCandidateScore(settingsField, windowFrame: windowFrame) != nil)
     }
 
     @Test func codexComposerSemanticsAndTraversalPriorityReachTheVisibleEditor() {

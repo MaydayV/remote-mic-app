@@ -210,6 +210,15 @@ enum KeyboardInjector {
         customApplicationURL: (CustomApplicationProfile) -> URL? = resolveCustomApplicationURL,
         customApplicationOpener: CustomApplicationOpener = openCustomApplication,
         customApplicationFocuser: @escaping CustomApplicationFocuser = focusCustomApplication,
+        frontmostComposerFocuser: (@escaping (Bool) -> Void) -> Bool = { completion in
+            guard let processIdentifier = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+                completion(false)
+                return false
+            }
+            let focused = focusComposer(processIdentifier: processIdentifier)
+            completion(focused)
+            return focused
+        },
         accessibilityTrusted: () -> Bool = { isAccessibilityTrusted },
         keyPoster: KeyPoster = { postKey(code: $0, flags: $1) },
         scrollPoster: ScrollPoster = { postScrollWheel(lines: $0) }
@@ -248,6 +257,12 @@ enum KeyboardInjector {
         if action == .customShortcut, shortcut == nil {
             AppLogger.shared.write("SHORTCUT ACTION ignored reason=not_configured")
             return true
+        }
+        if action == .focusInput {
+            guard accessibilityTrusted() else { return false }
+            return frontmostComposerFocuser { focused in
+                AppLogger.shared.write("APP FOCUS action=focus_input focused=\(focused)")
+            }
         }
         guard accessibilityTrusted() else { return false }
 
@@ -326,6 +341,8 @@ enum KeyboardInjector {
             if let shortcut {
                 keyPoster(CGKeyCode(shortcut.keyCode), shortcut.cgEventFlags)
             }
+        case .focusInput:
+            break
         case .openCustomApplication:
             break
         case .toggleLongRecording, .toggleMouseMode:
@@ -773,9 +790,6 @@ enum KeyboardInjector {
     private static func focusComposer(processIdentifier: pid_t) -> Bool {
         let applicationElement = AXUIElementCreateApplication(processIdentifier)
         for window in applicationWindows(applicationElement) {
-            let windowTitle = axString(window, attribute: kAXTitleAttribute).lowercased()
-            let excludedWindowTerms = ["settings", "preferences", "设置", "偏好设置"]
-            guard !excludedWindowTerms.contains(where: windowTitle.contains) else { continue }
             let candidates = accessibilityTextCandidates(in: window)
             guard let candidateIndex = bestComposerCandidateIndex(
                 candidates.map(\.snapshot),
@@ -995,8 +1009,7 @@ enum KeyboardInjector {
         let value = value.lowercased()
         let terms = [
             "password", "passcode", "secret", "api key", "apikey", "token", "credit card",
-            "search", "find", "filter", "address bar", "settings", "preferences",
-            "密码", "口令", "密钥", "令牌", "银行卡", "搜索", "查找", "筛选", "设置", "偏好",
+            "密码", "口令", "密钥", "令牌", "银行卡",
         ]
         return terms.contains(where: value.contains)
     }
@@ -1206,11 +1219,9 @@ enum KeyboardInjector {
         .lowercased()
 
         let excludedTerms = [
-            "search", "find", "filter", "title", "rename", "api key", "apikey", "token",
-            "password", "secret", "settings", "preferences", "command palette", "address bar",
-            "terminal", "console", "shell", "xterm", "approval", "permission", "code editor", "monaco",
-            "搜索", "查找", "筛选", "标题", "重命名", "密钥", "令牌", "密码", "设置", "偏好",
-            "终端", "控制台", "审批", "权限", "代码编辑器",
+            "title", "rename", "api key", "apikey", "token", "password", "secret",
+            "command palette", "address bar", "approval", "permission", "code editor", "monaco",
+            "标题", "重命名", "密钥", "令牌", "密码", "审批", "权限", "代码编辑器",
         ]
         guard !excludedTerms.contains(where: semanticText.contains) else { return nil }
 
@@ -1222,9 +1233,15 @@ enum KeyboardInjector {
         let supportingTerms = [
             "message", "prompt", "reply", "ask claude", "ask anything", "chat", "提问", "回复",
         ]
+        let explicitlyAllowedTerms = [
+            "search", "find", "filter", "settings", "preferences", "terminal", "console", "shell", "xterm",
+            "搜索", "查找", "筛选", "设置", "偏好", "终端", "控制台",
+        ]
         let hasStrongSemanticMatch = strongTerms.contains(where: semanticText.contains)
         let hasSupportingSemanticMatch = supportingTerms.contains(where: semanticText.contains)
-        guard candidate.role == "AXTextArea" || hasStrongSemanticMatch || hasSupportingSemanticMatch else {
+        let hasExplicitlyAllowedMatch = explicitlyAllowedTerms.contains(where: semanticText.contains)
+        guard candidate.role == "AXTextArea" || hasStrongSemanticMatch || hasSupportingSemanticMatch ||
+                hasExplicitlyAllowedMatch else {
             return nil
         }
 
@@ -1233,6 +1250,8 @@ enum KeyboardInjector {
             score += 120
         } else if hasSupportingSemanticMatch {
             score += 70
+        } else if hasExplicitlyAllowedMatch {
+            score += 80
         }
 
         if let frame = candidate.frame {
