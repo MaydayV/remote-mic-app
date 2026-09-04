@@ -10,6 +10,12 @@ import Foundation
 final class SiriRemoteBuiltinMicFallback {
     typealias AudioHandler = ([Float], Double) -> Void
 
+    private enum MicrophonePermission {
+        case granted
+        case denied
+        case undetermined
+    }
+
     var onAudioSamples: AudioHandler?
     var onStateChange: ((Bool) -> Void)?
     var onDiagnostics: ((String) -> Void)?
@@ -35,9 +41,9 @@ final class SiriRemoteBuiltinMicFallback {
 
     private func startOnQueue() {
         guard !running else { return }
-        let permission = AVAudioApplication.shared.recordPermission
+        let permission = microphonePermission()
         if permission == .undetermined {
-            AVAudioApplication.requestRecordPermission { [weak self] granted in
+            requestMicrophonePermission { [weak self] granted in
                 guard let self else { return }
                 self.queue.async {
                     if granted {
@@ -140,6 +146,31 @@ final class SiriRemoteBuiltinMicFallback {
             input.removeTap(onBus: 0)
             emit("SIRI REMOTE builtin fallback unavailable reason=start_failed error=\(error.localizedDescription)")
             onStateChange?(false)
+        }
+    }
+
+    private func microphonePermission() -> MicrophonePermission {
+        if #available(macOS 14.0, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted: return .granted
+            case .denied: return .denied
+            case .undetermined: return .undetermined
+            @unknown default: return .denied
+            }
+        }
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return .granted
+        case .denied, .restricted: return .denied
+        case .notDetermined: return .undetermined
+        @unknown default: return .denied
+        }
+    }
+
+    private func requestMicrophonePermission(_ completion: @escaping (Bool) -> Void) {
+        if #available(macOS 14.0, *) {
+            AVAudioApplication.requestRecordPermission(completionHandler: completion)
+        } else {
+            AVCaptureDevice.requestAccess(for: .audio, completionHandler: completion)
         }
     }
 
