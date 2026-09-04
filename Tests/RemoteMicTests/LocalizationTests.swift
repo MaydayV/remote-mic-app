@@ -34,6 +34,7 @@ struct LocalizationTests {
         let englishInfo = try strings(at: englishDirectory.appendingPathComponent("InfoPlist.strings"))
 
         #expect(english["action.command_delete"] == "Command-Delete")
+        #expect(english["statistics.metric.week_button_count"] == "This Week's Presses")
 
         #expect(!english.isEmpty)
         for (key, value) in english {
@@ -47,6 +48,7 @@ struct LocalizationTests {
             let localizedInfo = try strings(at: directory.appendingPathComponent("InfoPlist.strings"))
             if directory.lastPathComponent == "zh-Hans.lproj" {
                 #expect(localized["action.command_delete"] == "Command-Delete")
+                #expect(localized["statistics.metric.week_button_count"] == "本周按键次数")
             }
             #expect(Set(localized.keys) == Set(english.keys))
             #expect(Set(localizedInfo.keys) == Set(englishInfo.keys))
