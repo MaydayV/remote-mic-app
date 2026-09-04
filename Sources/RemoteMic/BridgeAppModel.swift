@@ -78,6 +78,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     private static let longRecordingCloseTimeout: TimeInterval = 2
 
     let settings: AppSettings
+    let loginItemService: LoginItemService
 
     @Published private(set) var connectionStatus = LocalizedMessage("bluetooth.status.initializing")
     @Published private(set) var hidStatus = LocalizedMessage("button_mapping.status.disabled")
@@ -238,9 +239,11 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         virtualAudioKeepAliveEnabled: Bool =
             ProcessInfo.processInfo.arguments.contains("--virtual-audio-keep-alive") ||
             UserDefaults.standard.bool(forKey: "VirtualAudioKeepAliveEnabled"),
-        isUserVisibleWake: @escaping () -> Bool = { SystemWakeEnvironment.isUserVisibleWake }
+        isUserVisibleWake: @escaping () -> Bool = { SystemWakeEnvironment.isUserVisibleWake },
+        loginItemService: LoginItemService = LoginItemService()
     ) {
         self.settings = settings
+        self.loginItemService = loginItemService
         self.virtualAudioKeepAliveEnabled = virtualAudioKeepAliveEnabled
         self.isUserVisibleWake = isUserVisibleWake
         activeBackendKind = RemoteBackendKind(rawValue: settings.activeBackendKindRawValue)

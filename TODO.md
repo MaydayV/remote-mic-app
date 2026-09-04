@@ -1,5 +1,7 @@
 # TODO
 
+- [x] 同步上游预览版登录项功能：关于页新增“登录时自动启动”开关，使用原生 `SMAppService.mainApp` 注册/注销，处理 macOS 待批准状态、失败反馈及返回前台刷新；默认关闭，不改变菜单栏常驻、Dock 图标或启动窗口偏好。自动化与手动验收边界见 [`Testing/LoginAtLogin.md`](Testing/LoginAtLogin.md)。
+
 - [x] 原生 Siri Remote 语音设置闭环：设置页显示 PacketLogger 可用性，提供中英文安装说明；内置麦克风降级的采样率转换器按音频回调生命周期安全持有，避免权限/设备切换时的线程竞态；遥控器 PCM 暂时中断时，语音会话在 350ms 后自动使用内置麦克风，恢复后无缝切回。仍需真实 macOS 与 Siri Remote 验收。
 
 - [ ] 使用 Cloudflare CDN 加速 Mac 下载

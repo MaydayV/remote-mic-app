@@ -106,6 +106,24 @@ struct SettingsPageRegressionTests {
         #expect(settingsSource.contains("driver_operation_failed"))
     }
 
+    @Test func loginItemPreferenceUsesNativeServiceAndHasRecoveryCopy() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let serviceSource = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/LoginItemService.swift"),
+            encoding: .utf8
+        )
+        let settingsSource = try String(
+            contentsOf: root.appendingPathComponent("Sources/RemoteMic/SettingsView.swift"),
+            encoding: .utf8
+        )
+        #expect(serviceSource.contains("SMAppService.mainApp"))
+        #expect(settingsSource.contains("about.preferences.launch_at_login"))
+        #expect(settingsSource.contains("openLoginItemsSettings"))
+    }
+
     @Test func mappingSelectionStaysOnTheEditedButtonWhileLocked() {
         #expect(MappingSelectionPolicy.selection(
             current: .home,

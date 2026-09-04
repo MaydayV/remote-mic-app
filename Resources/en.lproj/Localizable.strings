@@ -392,6 +392,11 @@
 "about.version.history_load_failed" = "Version history could not be loaded.";
 "about.preferences.open_main_window_at_launch" = "Open main window at launch";
 "about.preferences.open_main_window_help" = "When disabled, ordinary launches stay in the menu bar; the main window still appears after an update.";
+"about.preferences.launch_at_login" = "Launch at login";
+"about.preferences.launch_at_login_help" = "Start Remote Mic automatically when you sign in to macOS. Disabled by default.";
+"about.preferences.launch_at_login_requires_approval" = "macOS requires your approval in Login Items.";
+"about.preferences.launch_at_login_update_failed" = "Could not update the login item. Check Login Items settings.";
+"about.preferences.launch_at_login_open_system_settings" = "Open Login Items settings";
 "about.preferences.language_description" = "Choose the app interface language.";
 "update.completed.title" = "Remote Mic Updated";
 "update.completed.message" = "Successfully updated to version %1$@.";
