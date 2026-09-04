@@ -72,6 +72,11 @@ xcodebuild \
 ditto --norsrc --noextattr --noqtn --noacl \
   "$SOURCE_ROOT/build/Release/$PRODUCT_NAME.driver" "$OUTPUT"
 /usr/bin/strip -S "$OUTPUT/Contents/MacOS/$PRODUCT_NAME"
+# The upstream README contains a sample /Users/user/Library path that is not
+# needed at runtime and is rejected by the app privacy-path release gate.
+# Remove it before signing so the driver's sealed resource list stays valid
+# when the signed driver is embedded in the application bundle.
+rm -f "$OUTPUT/Contents/Resources/README.md"
 if [[ "$SIGNING_IDENTITY" == "-" ]]; then
   codesign --force --deep --sign - --timestamp=none "$OUTPUT"
 else
