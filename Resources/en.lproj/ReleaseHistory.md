@@ -1,5 +1,10 @@
 # Version History
 
+## 1.8.41 (Preview)
+
+- Fixed the protected release checkout so signed preview packages can complete publication without changing the app worktree.
+- Includes the optional Launch at Login setting and improved Focus Input Field behavior from the previous preview candidate.
+
 ## 1.8.12 (Pre-release)
 
 - Improved the speed and reliability of Mac installer and automatic-update downloads. Existing versions can continue checking for updates, with GitHub downloads retained as a fallback.
