@@ -1,5 +1,23 @@
 # Bug 记录
 
+- [自定义组合快捷键缺少修饰键释放](./2026-09-16-custom-shortcut-missing-modifier-release.md)
+
+- [配置解码失败被静默重置（用户配置无声丢失且无线索）](./2026-09-05-settings-decode-failure-silently-resets-configuration.md)
+- [关闭原始录音开关仍保存当前音频](./2026-08-27-original-recording-cancel-commits-audio.md)
+- [Onboarding 语音测试页隐藏第三方配置](./2026-09-05-onboarding-voice-test-hidden-tool-configuration.md)
+- [1.9.19 偶发显示“暂时无法获取更新信息”](./2026-09-03-github-api-update-feed-unavailable/DEBUG.md)
+- [Onboarding 语音诊断无法区分焦点、音频输出与第三方未提交](./2026-08-31-onboarding-voice-attempt-diagnostics/DEBUG.md)
+- [Onboarding 选择其他语音工具时隐藏豆包官方安装入口](./2026-08-29-onboarding-doubao-install-link-hidden.md)
+- [Onboarding 已收到语音但没有文字，诊断事件反复跳变](./2026-08-29-onboarding-voice-test-focus-and-diagnostics.md)
+- [Onboarding 权限页返回按钮点击后停留原页](./2026-08-29-onboarding-permissions-back-auto-route.md)
+- [预览包 Build 回退导致更新误判与版本历史按钮误导](./2026-08-27-sparkle-preview-build-regression-and-history-button.md)
+- [点击 Siri Remote 页面因私有资源 Bundle 路径崩溃](./2026-09-08-siri-remote-page-resource-bundle-crash.md)
+- [MiRemoteV 2ch 启动时历史选择丢失导致无法语音](./2026-09-12-miremotev-selection-lost-on-startup.md)
+
+- [回眸无可编辑输入框时录音归为未知应用且不可见](./2026-08-27-reflections-recording-metadata-fallback.md)
+- [1.9.13 搜索框与 cmux 语音输入边界](./2026-08-26-voice-input-search-and-cmux-boundary.md)
+- [休眠唤醒后蓝牙失效，以及豆包有电平但没有文字](./2026-08-25-sleep-wake-and-doubao-voice-failure.md)
+- [自定义快捷键连续快速按只有第一次生效](./2026-08-25-custom-shortcut-rapid-press-dropped.md)
 - [历史蓝牙缓存持续固定频率重连](./2026-08-24-ble-cached-reconnect-storm.md)
 - [不同版本的无线麦同时运行](./2026-08-24-duplicate-app-instances.md)
 - [首次启动窗口尺寸与居中异常](./2026-08-24-onboarding-first-launch-window-offscreen.md)

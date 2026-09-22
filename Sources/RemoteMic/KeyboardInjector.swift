@@ -221,7 +221,10 @@ enum KeyboardInjector {
         },
         accessibilityTrusted: () -> Bool = { isAccessibilityTrusted },
         keyPoster: KeyPoster = { postKey(code: $0, flags: $1) },
-        scrollPoster: ScrollPoster = { postScrollWheel(lines: $0) }
+        keyStatePoster: KeyStatePoster = postKeyState,
+        scrollPoster: ScrollPoster = { postScrollWheel(lines: $0) },
+        shortcutEventPoster: (CGEvent) -> Bool = ShortcutEventSequence.post,
+        shortcutHardwareFlags: () -> CGEventFlags = { CGEventSource.flagsState(.hidSystemState) }
     ) -> Bool {
         guard action != .disabled else { return true }
         if action.isAppInternal {
@@ -339,7 +342,20 @@ enum KeyboardInjector {
             keyPoster(124, .maskCommand)
         case .customShortcut:
             if let shortcut {
-                keyPoster(CGKeyCode(shortcut.keyCode), shortcut.cgEventFlags)
+                let eventFlags = shortcut.cgEventFlags
+                if !eventFlags.isEmpty {
+                    return ShortcutEventSequence.send(
+                        keyCode: CGKeyCode(shortcut.keyCode),
+                        modifiers: eventFlags,
+                        hardwareFlags: shortcutHardwareFlags,
+                        eventPoster: shortcutEventPoster
+                    )
+                }
+                keyPoster(CGKeyCode(shortcut.keyCode), eventFlags)
+                AppLogger.shared.write(
+                    "SHORTCUT ACTION submitted key_code=\(shortcut.keyCode) " +
+                        "modifier_flags=\(eventFlags.rawValue) standalone=false"
+                )
             }
         case .focusInput:
             break
