@@ -215,6 +215,7 @@
   - 2026-09-02 开始移植原生 macOS 语音路径：新增 PacketLogger `.pklg` 增量读取、HCI ACL/L2CAP 重组、ATT `0x1B` 语音通知解析、管理员捕获进程、60ms 抖动缓冲和丢帧静音补偿，并接入现有 Opus/虚拟音频回调；设置页提供 HCI 开关和捕获进程状态，`scripts/enable-siri-remote-native-mic.sh` 保留为显式、可逆的命令行回退。当前仍需第三代 Siri Remote 真机验证、PacketLogger Additional Tools 安装和系统级虚拟麦克风长期稳定性验收，未标记 Apple 语音支持完成。
   - 2026-09-02 原生语音增加降级和驱动可恢复操作：PacketLogger、管理员授权或 HCI 捕获失败时保留 Direct HID，不阻断按键链路；原生语音空闲时可将内置麦克风送入已选择的虚拟麦克风；设置页可检查、安装和卸载 MiRemoteV 2ch 兼容 HAL 驱动，安装拒绝覆盖、卸载核对 Bundle ID；同步填充参考 HAL 使用的两条 POSIX 共享内存环。自动化 301/301 通过；驱动和原生语音仍需真实 macOS、PacketLogger 与 Siri Remote 验收。
   - 2026-09-22 同步上游睡眠唤醒修复：保留系统唤醒后的蓝牙恢复意图，等应用真正恢复后再重连；若 CoreBluetooth 已恢复则跳过重复拆连。自动化见 `Testing/BluetoothWakeRecovery.md`，真实睡眠/唤醒仍待硬件验收。
+  - 2026-09-22 移植上游“一键切回上个 App”动作：使用一次性的 Command-Tab 生命周期，不占用持续 App 切换器状态，失败也保证释放 Command；见 `Testing/PreviousAppSwitch.md`。
 - [ ] 支持 Xiaomi Bluetooth Remote Control 2（RC001-MS）
   - 已通过真机确认 RC001-MS 可以连接 Mac，除语音键之外的普通按键能够被现有 App 或 macOS 识别；语音键没有普通按键事件不代表设备没有语音能力，当前未知项是 Voice GATT / HID Report、音频包格式和编码方式。
   - 实现前先记录现有 RC003-MS 的服务、Characteristic、控制包、音频包和解码基线，再为 RC001-MS 增加只用于诊断的完整 Service Discovery、Notify / Indicate 订阅和受控数据日志；不得根据同系列型号猜测 UUID 或直接复制 RC003 常量。

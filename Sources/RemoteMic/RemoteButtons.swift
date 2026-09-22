@@ -466,6 +466,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
     case showDesktop
     case contextMenu
     case appSwitcher
+    case switchToPreviousApp
     case volumeUp
     case volumeDown
     case volumeMute
@@ -524,6 +525,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
         case .showDesktop: return localization.text("action.show_desktop")
         case .contextMenu: return localization.text("action.context_menu")
         case .appSwitcher: return localization.text("action.app_switcher")
+        case .switchToPreviousApp: return localization.text("action.switch_to_previous_app")
         case .volumeUp: return localization.text("action.system_volume_up")
         case .volumeDown: return localization.text("action.system_volume_down")
         case .volumeMute: return localization.text("action.system_mute")
@@ -582,7 +584,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
              .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .scrollUp, .scrollDown,
              .deleteBackward:
             return .basicKeys
-        case .showDesktop, .contextMenu, .appSwitcher, .volumeUp, .volumeDown, .volumeMute,
+        case .showDesktop, .contextMenu, .appSwitcher, .switchToPreviousApp, .volumeUp, .volumeDown, .volumeMute,
              .playPause, .previousCommandLeft, .nextCommandRight, .toggleLongRecording,
              .mouseLeftClick, .mouseRightClick, .mouseMiddleClick:
             return .systemAndMedia
@@ -597,6 +599,7 @@ enum ButtonAction: String, CaseIterable, Codable, Identifiable {
 
     var allowsRepeat: Bool {
         ![
+            .switchToPreviousApp,
             .customShortcut,
             .focusInput,
             .openCustomApplication,

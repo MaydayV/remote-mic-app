@@ -322,6 +322,8 @@ enum KeyboardInjector {
             keyPoster(contextualMenuKeyCode, [])
         case .appSwitcher:
             keyPoster(48, .maskCommand)
+        case .switchToPreviousApp:
+            return switchToPreviousApp(keyStatePoster: keyStatePoster)
         case .volumeUp:
             postSystemKey(type: 0)
         case .volumeDown:
@@ -368,6 +370,34 @@ enum KeyboardInjector {
             break
         }
         return true
+    }
+
+    /// Sends one complete Command-Tab transaction and immediately releases it.
+    /// This is intentionally separate from `AppSwitcherSession`, which keeps
+    /// Command held while the user navigates the switcher.
+    static func switchToPreviousApp(
+        keyStatePoster: KeyStatePoster,
+        diagnosticLogger: (String) -> Void = { AppLogger.shared.write($0) }
+    ) -> Bool {
+        let operationID = UUID().uuidString
+        let prefix = "KEYBOARD PREVIOUS_APP operation_id=\(operationID)"
+        diagnosticLogger("\(prefix) phase=requested")
+        let commandDown = keyStatePoster(leftCommandKeyCode, true, .maskCommand)
+        var tabDown = false
+        var tabUp = false
+        if commandDown {
+            tabDown = keyStatePoster(48, true, .maskCommand)
+            tabUp = keyStatePoster(48, false, .maskCommand)
+        }
+        // Always attempt the release, including when an earlier post failed.
+        let commandUp = keyStatePoster(leftCommandKeyCode, false, [])
+        let submitted = commandDown && tabDown && tabUp && commandUp
+        diagnosticLogger(
+            "\(prefix) phase=completed result=\(submitted ? "submitted" : "failed") " +
+                "command_down=\(commandDown) tab_down=\(tabDown) " +
+                "tab_up=\(tabUp) command_up=\(commandUp) user_visible_result=unknown"
+        )
+        return submitted
     }
 
     static func postMouseClick(button: MouseClickButton, at point: CGPoint? = nil) {

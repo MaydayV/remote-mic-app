@@ -679,6 +679,44 @@ struct RemoteButtonsTests {
         #expect(posted[9].2.isEmpty)
     }
 
+    @Test func previousAppActionPostsOneCompleteTap() {
+        var posted: [(CGKeyCode, Bool, CGEventFlags)] = []
+        #expect(KeyboardInjector.send(
+            .switchToPreviousApp,
+            accessibilityTrusted: { true },
+            keyPoster: { _, _ in Issue.record("Must send explicit key states") },
+            keyStatePoster: {
+                posted.append(($0, $1, $2))
+                return true
+            }
+        ))
+        #expect(posted.map(\.0) == [55, 48, 48, 55])
+        #expect(posted.map(\.1) == [true, true, false, false])
+        #expect(posted.map(\.2) == [.maskCommand, .maskCommand, .maskCommand, []])
+    }
+
+    @Test(arguments: 0..<4)
+    func previousAppActionAlwaysAttemptsRelease(failureIndex: Int) {
+        var posted: [(CGKeyCode, Bool, CGEventFlags)] = []
+        #expect(!KeyboardInjector.switchToPreviousApp(
+            keyStatePoster: {
+                posted.append(($0, $1, $2))
+                return posted.count - 1 != failureIndex
+            },
+            diagnosticLogger: { _ in }
+        ))
+        #expect(posted.last?.0 == KeyboardInjector.leftCommandKeyCode)
+        #expect(posted.last?.1 == false)
+        #expect(posted.last?.2.isEmpty == true)
+    }
+
+    @Test func previousAppActionIsNonRepeatingAndLocalized() {
+        #expect(ButtonAction.switchToPreviousApp.category == .systemAndMedia)
+        #expect(!ButtonAction.switchToPreviousApp.allowsRepeat)
+        let localization = LocalizationStore(settings: AppSettings(defaults: .standard))
+        #expect(!ButtonAction.switchToPreviousApp.displayName(using: localization).isEmpty)
+    }
+
     @Test func appSwitcherRemoteControlsNavigateConfirmAndReportFinalFrontmostApp() throws {
         let suiteName = "RemoteButtonsTests.appSwitcherControls.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
