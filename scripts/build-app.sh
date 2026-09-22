@@ -46,19 +46,31 @@ BIN_DIR="$(xcrun swift build \
   --triple "$RELEASE_TRIPLE" \
   --show-bin-path)"
 BIN_PATH="$BIN_DIR/$APP_NAME"
+APPLE_REMOTE_AUDIO_HELPER_PATH="$BIN_DIR/AppleRemoteAudioCapture"
+APPLE_REMOTE_HCI_SERVICE_PATH="$BIN_DIR/AppleRemoteHCIService"
 
 case "$APP_DIR" in
   "$ROOT/dist/"*.app|"$ROOT/dist/intel/"*.app) ;;
   *) print -u2 "refusing to clean unexpected app path: $APP_DIR"; exit 1 ;;
 esac
 rm -rf -- "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Helpers" "$APP_DIR/Contents/Resources"
+test -x "$APPLE_REMOTE_AUDIO_HELPER_PATH"
+test -x "$APPLE_REMOTE_HCI_SERVICE_PATH"
 test -d "$SPARKLE_FRAMEWORK"
 ditto --norsrc --noextattr --noqtn --noacl \
   "$BIN_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 strip -S -x "$APP_DIR/Contents/MacOS/$APP_NAME"
 install_name_tool -add_rpath @executable_path/../Frameworks \
   "$APP_DIR/Contents/MacOS/$APP_NAME"
+ditto --norsrc --noextattr --noqtn --noacl \
+  "$APPLE_REMOTE_AUDIO_HELPER_PATH" \
+  "$APP_DIR/Contents/Helpers/SayAllAppleRemoteAudioCapture"
+ditto --norsrc --noextattr --noqtn --noacl \
+  "$APPLE_REMOTE_HCI_SERVICE_PATH" \
+  "$APP_DIR/Contents/Helpers/SayAllAppleRemoteHCIService"
+strip -S -x "$APP_DIR/Contents/Helpers/SayAllAppleRemoteAudioCapture"
+strip -S -x "$APP_DIR/Contents/Helpers/SayAllAppleRemoteHCIService"
 ditto --norsrc --noextattr --noqtn --noacl \
   "$ROOT/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 if [[ "$RELEASE_VARIANT" == "intel" ]]; then
@@ -140,6 +152,8 @@ find "$APP_DIR" -type d -exec chmod 755 {} +
 find "$APP_DIR" -type f -exec chmod 644 {} +
 for executable in \
   "$APP_DIR/Contents/MacOS/$APP_NAME" \
+  "$APP_DIR/Contents/Helpers/SayAllAppleRemoteAudioCapture" \
+  "$APP_DIR/Contents/Helpers/SayAllAppleRemoteHCIService" \
   "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" \
   "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
   "$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater" \
@@ -155,6 +169,19 @@ fi
 
 SPARKLE_VERSION_DIR="$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B"
 if [[ "$SIGNING_IDENTITY" != "-" ]]; then
+  codesign \
+    --force \
+    --options runtime \
+    --timestamp \
+    --identifier com.hd838a.SayAll.AppleRemoteHCIService \
+    --sign "$SIGNING_IDENTITY" \
+    "$APP_DIR/Contents/Helpers/SayAllAppleRemoteHCIService"
+  codesign \
+    --force \
+    --options runtime \
+    --timestamp \
+    --sign "$SIGNING_IDENTITY" \
+    "$APP_DIR/Contents/Helpers/SayAllAppleRemoteAudioCapture"
   codesign \
     --force \
     --options runtime \
@@ -195,6 +222,17 @@ if [[ "$SIGNING_IDENTITY" != "-" ]]; then
 fi
 if [[ "$SIGNING_IDENTITY" == "-" ]]; then
   BUNDLE_IDENTIFIER="$(plutil -extract CFBundleIdentifier raw -o - "$APP_DIR/Contents/Info.plist")"
+  codesign \
+    --force \
+    --timestamp=none \
+    --identifier com.hd838a.SayAll.AppleRemoteHCIService \
+    --sign - \
+    "$APP_DIR/Contents/Helpers/SayAllAppleRemoteHCIService"
+  codesign \
+    --force \
+    --timestamp=none \
+    --sign - \
+    "$APP_DIR/Contents/Helpers/SayAllAppleRemoteAudioCapture"
   codesign \
     --force \
     --timestamp=none \

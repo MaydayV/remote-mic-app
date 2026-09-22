@@ -50,6 +50,8 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     var onConnectionStateChange: ((Bool) -> Void)?
     /// 原生 HCI 捕获进程状态（不是蓝牙连接状态）。
     var onNativeMicCaptureStateChange: ((Bool) -> Void)?
+    /// 上游 Apple Remote 音频 Helper/HCI 服务状态。
+    var onUpstreamAudioStatus: ((String) -> Void)?
     /// 原生捕获空闲时的内置麦克风降级流。
     var onBuiltinMicFallbackSamples: (([Float], Double) -> Void)?
     var onBuiltinMicFallbackStateChange: ((Bool) -> Void)?
@@ -91,6 +93,11 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
     private var nativeAudioFrameSeen = false
     /// PacketLogger/HCI 捕获路径；复用现有 Opus 解码与虚拟音频输出。
     private let nativeMicCapture = SiriRemoteNativeMicCapture()
+    /// Upstream's packet-capture pipeline. It is preferred whenever the signed
+    /// helper/HCI service is ready; the legacy direct-HID/PacketLogger path
+    /// remains a runtime fallback for older installations.
+    private let upstreamAudioClient = AppleRemoteAudioClient()
+    private var upstreamAudioCaptureActive = false
     private let builtinMicFallback = SiriRemoteBuiltinMicFallback()
     /// Optional IPC for the system-wide Siri Remote Mic HAL. The app-level
     /// VirtualAudioOutput remains authoritative when no HAL is installed.
@@ -112,6 +119,21 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
                 self.onAudioSamples?(samples, sampleRate)
             }
         }
+        upstreamAudioClient.onSamples = { [weak self] samples in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.nativeAudioFrameSeen = true
+                let floats = samples.map { Float($0) / Float(Int16.max) }
+                self.onAudioSamples?(floats, 16_000)
+            }
+        }
+        upstreamAudioClient.onStatus = { status in
+            AppLogger.shared.write("APPLE REMOTE AUDIO upstream_status=\(status)")
+            Task { @MainActor [weak self] in
+                self?.onUpstreamAudioStatus?(status)
+            }
+        }
+        upstreamAudioClient.start()
         nativeMicCapture.onCaptureStateChange = { [weak self] running in
             Task { @MainActor [weak self] in
                 self?.onNativeMicCaptureStateChange?(running)
@@ -139,6 +161,9 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         started = false
         nativeMicCapture.stopVoice()
         nativeMicCapture.stop()
+        upstreamAudioClient.stop()
+        upstreamAudioCaptureActive = false
+        onUpstreamAudioStatus?("stopped")
         builtinMicFallback.stop()
         sharedMicRing.stop()
         disconnectAll()
@@ -168,13 +193,25 @@ final class SiriRemoteBackend: @MainActor RemoteBackend {
         voiceActive = true
         nativeAudioFrameSeen = false
         sharedMicRing.setRemoteActive(true)
-        nativeMicCapture.startVoice()
+        if upstreamAudioClient.beginCapture() {
+            upstreamAudioCaptureActive = true
+            AppLogger.shared.write("SIRI REMOTE voice_capture route=upstream_packet_helper")
+        } else {
+            upstreamAudioCaptureActive = false
+            nativeMicCapture.startVoice()
+            AppLogger.shared.write("SIRI REMOTE voice_capture route=legacy_fallback")
+        }
     }
 
     func stopMicrophone() {
         voiceActive = false
         sharedMicRing.setRemoteActive(false)
-        nativeMicCapture.stopVoice()
+        if upstreamAudioCaptureActive {
+            upstreamAudioClient.stopCapture()
+            upstreamAudioCaptureActive = false
+        } else {
+            nativeMicCapture.stopVoice()
+        }
     }
 
     /// Refresh the native capture process after the user changes the HCI setup

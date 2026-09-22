@@ -122,6 +122,9 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     /// 原生 Siri 语音捕获的系统 HCI 调试开关状态。
     @Published private(set) var isSiriRemoteNativeMicConfigured = false
     @Published private(set) var isSiriRemotePacketLoggerAvailable = false
+    /// 上游 Apple Remote 音频 Helper/HCI 管线是否已建立 IPC。
+    @Published private(set) var isSiriRemoteUpstreamAudioReady = false
+    @Published private(set) var siriRemoteUpstreamAudioStatus = "not_started"
     @Published private(set) var isSiriRemoteNativeMicCaptureRunning = false
     @Published private(set) var isSiriRemoteBuiltinMicFallbackRunning = false
     @Published private(set) var isSiriRemoteNativeMicSetupRunning = false
@@ -1406,6 +1409,13 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
             siriRemoteBackend.onNativeMicCaptureStateChange = { [weak self] running in
                 DispatchQueue.main.async {
                     self?.isSiriRemoteNativeMicCaptureRunning = running
+                }
+            }
+            siriRemoteBackend.onUpstreamAudioStatus = { [weak self] status in
+                DispatchQueue.main.async {
+                    self?.siriRemoteUpstreamAudioStatus = status
+                    self?.isSiriRemoteUpstreamAudioReady =
+                        status == "ipc_ready" || status == "ready" || status == "capturing"
                 }
             }
             siriRemoteBackend.onBuiltinMicFallbackSamples = { [weak self] samples, sampleRate in

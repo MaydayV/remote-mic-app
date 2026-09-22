@@ -1,7 +1,7 @@
 # Siri Remote 后端集成 — 测试手册
 
 > 适用分支：`self-contained-base`（v1.8.5 时代基线 + Siri Remote 集成改动）
-> 版本：1.3（2026-09-03）
+> 版本：1.4（2026-09-22）
 > 说明：本手册覆盖 Siri Remote 后端的自动化验证边界与真机验收用例。
 > **真机用例尚未执行**——需要第三代 Apple TV Siri Remote（USB-C）硬件。
 
@@ -9,7 +9,7 @@
 
 - 设置页"连接设备"选择：Apple Siri Remote（第三代·USB-C）/ 小米蓝牙遥控器 2 Pro
 - Siri Remote 按键 → 统一事件 → 现有单击/双击/长按/快捷键/打开 App 全部可用
-- Siri Remote 语音键 → Opus 解码 → 48 kHz → Fn 点按/虚拟麦克风共用会话链路
+- Siri Remote 语音键 → 上游 Apple Remote Audio Helper/HCI 服务 → Opus 解码 → 16 kHz → Fn 点按/虚拟麦克风共用会话链路
 - 原生捕获和内置降级同时写入参考项目兼容的 POSIX 共享内存环；未安装系统 HAL 时仍使用现有
   `VirtualAudioOutput`，不会自动修改系统默认输入设备。
 - Siri Remote 专用平铺映射页（语音键固定，其他按键均支持单击/双击/长按）
@@ -26,7 +26,7 @@
 
 | 用例 | 命令 | 结果 |
 |---|---|---|
-| 全部单元测试 | `swift test` | ✅ 301/301 通过 |
+| 全部单元测试 | `swift test` | ✅ 328/328 通过 |
 | 构建 | `swift build` | ✅ 0 error |
 
 新增自动化覆盖：
@@ -42,6 +42,26 @@
 ## 真机验收用例
 
 ### U3-Native 原生 macOS 语音捕获
+
+#### 上游 Helper 路径（首选）
+
+正式 App 会把上游 `AppleRemoteAudioCapture` 与特权 `AppleRemoteHCIService` 嵌入
+`Contents/Helpers/`，安装包同时注册 `com.hd838a.SayAll.AppleRemoteHCIService` LaunchDaemon。
+选择 Apple Siri Remote 后，App 自动启动 Helper、通过 HCI 服务短时启用蓝牙音频 trace，再从
+本地 IPC 接收解码后的 PCM；不需要用户手动启动 PacketLogger。设置页显示“上游 Apple 遥控器
+语音通道已就绪”后，按住 Siri 键验证语音输入。
+
+安装器卸载时会先停止并恢复 HCI 偏好、移除 LaunchDaemon 与特权 Helper，再卸载兼容音频驱动；
+如果 Helper 或服务不可用，日志会记录 `upstream_status=unavailable:*`，随后自动使用旧版
+PacketLogger/Direct HID 降级链路。
+
+上游 HCI 服务会校验 App 的正式签名 Team ID；本地 ad-hoc 调试包会被服务拒绝，这是预期的
+安全边界。要验收完整上游路径，请使用 Developer ID 签名的安装包；ad-hoc 包只能验证 Helper
+启动和降级逻辑。
+
+验收日志关键字：`APPLE REMOTE AUDIO phase=ipc_ready`、`packet_stream phase=ready`、
+`voice_capture route=upstream_packet_helper`。若只看到 `route=legacy_fallback`，先检查
+安装包是否包含两个 Helper，以及系统服务是否已加载。
 
 该路径用于 macOS 不转发 Direct HID `0xFA` 音频报告的机器。它不会把遥控器注册成标准
 Bluetooth Audio，而是读取系统 HCI 抓包中的 GATT 语音通知，再复用 App 当前的 Opus 和虚拟

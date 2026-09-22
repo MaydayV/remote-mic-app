@@ -564,8 +564,9 @@
 "remote.backend.xiaomi_voice_hint" = "保持遥控器蓝牙连接，并在目标 App 中选择上方设置的语音输出设备。";
 "remote.backend.battery" = "电量 %d%%";
 "remote.backend.siri_voice_hint" = "macOS 可能只提供按键而不转发遥控器音频；当前语音仍需真机验证，按键映射不受影响。";
-"remote.backend.siri_native_setup_hint" = "语音捕获使用 macOS 原生 HCI 路径；启用后会请求麦克风权限，空闲时自动使用内置麦克风降级。";
+"remote.backend.siri_native_setup_hint" = "优先使用上游 Apple 遥控器语音 Helper；旧版 HCI/PacketLogger 路径仍作为降级方案。启用旧版路径会请求麦克风权限，空闲时自动使用内置麦克风降级。";
 "remote.backend.siri_native_setup_title" = "原生 Siri 语音捕获";
+"remote.backend.siri_upstream_ready" = "上游 Apple 遥控器语音通道已就绪；按住 Siri 键即可说话。";
 "remote.backend.siri_native_setup_enabled" = "已启用；优先从系统蓝牙 HCI 流读取音频，捕获不可用时自动回退到直接蓝牙语音。";
 "remote.backend.siri_native_capture_running" = "捕获进程运行中；按住 Siri 键即可读取语音。";
 "remote.backend.siri_builtin_fallback_running" = "原生捕获空闲时使用内置麦克风降级；按住 Siri 键会切换到遥控器语音。";
@@ -573,7 +574,7 @@
 "remote.backend.siri_native_setup_enable" = "启用原生捕获";
 "remote.backend.siri_native_setup_disable" = "关闭原生捕获";
 "remote.backend.siri_native_setup_failed" = "设置失败或已取消授权，请重试或使用测试手册中的脚本。";
-"remote.backend.siri_packetlogger_missing" = "未找到 PacketLogger。请安装 Apple Additional Tools 后重新启动 Remote Mic；按键可用并不代表 Siri 语音已被捕获。";
+"remote.backend.siri_packetlogger_missing" = "上游 Apple 遥控器语音 Helper 尚未就绪，且未找到 PacketLogger。请安装 Apple Additional Tools 作为旧版降级方案，然后重新启动 Remote Mic。";
 "remote.backend.siri_packetlogger_guide" = "打开原生语音设置说明";
 "remote.backend.siri_packetlogger_download" = "获取 Additional Tools";
 "remote.backend.siri_packetlogger_refresh" = "重新检测";

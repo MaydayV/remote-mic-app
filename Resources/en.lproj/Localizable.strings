@@ -564,8 +564,9 @@
 "remote.backend.xiaomi_voice_hint" = "Keep the remote connected and select the voice output device above in the target app.";
 "remote.backend.battery" = "Battery %d%%";
 "remote.backend.siri_voice_hint" = "macOS may expose the buttons without forwarding remote audio. Voice input still requires device verification; button mapping is unaffected.";
-"remote.backend.siri_native_setup_hint" = "Voice capture uses native macOS HCI tracing; enabling it requests mic access and enables the built-in mic fallback while idle.";
+"remote.backend.siri_native_setup_hint" = "The upstream Apple Remote audio helper is preferred. The legacy HCI/PacketLogger path remains available as a fallback; enabling it requests mic access and enables the built-in mic fallback while idle.";
 "remote.backend.siri_native_setup_title" = "Native Siri voice capture";
+"remote.backend.siri_upstream_ready" = "Upstream Apple Remote audio pipeline is ready; hold Siri to speak.";
 "remote.backend.siri_native_setup_enabled" = "Enabled; HCI capture is preferred and direct Bluetooth voice remains the automatic fallback.";
 "remote.backend.siri_native_capture_running" = "Capture process is running; hold Siri to read voice audio.";
 "remote.backend.siri_builtin_fallback_running" = "The built-in microphone is active as the idle fallback; holding Siri switches to remote voice.";
@@ -573,7 +574,7 @@
 "remote.backend.siri_native_setup_enable" = "Enable native capture";
 "remote.backend.siri_native_setup_disable" = "Disable native capture";
 "remote.backend.siri_native_setup_failed" = "Setup failed or authorization was cancelled. Retry or use the test-guide script.";
-"remote.backend.siri_packetlogger_missing" = "PacketLogger was not found. Install Apple's Additional Tools, then restart Remote Mic; buttons can work even when Siri audio cannot be captured.";
+"remote.backend.siri_packetlogger_missing" = "The upstream Apple Remote audio helper is not ready and PacketLogger was not found. Install Apple's Additional Tools for the legacy fallback, then restart Remote Mic.";
 "remote.backend.siri_packetlogger_guide" = "Open native voice setup guide";
 "remote.backend.siri_packetlogger_download" = "Get Additional Tools";
 "remote.backend.siri_packetlogger_refresh" = "Check Again";

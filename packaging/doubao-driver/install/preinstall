@@ -8,6 +8,8 @@ DESTINATION="${TARGET_VOLUME%/}/Library/Audio/Plug-Ins/HAL/MiRemoteV2ch.driver"
 PLIST="$DESTINATION/Contents/Info.plist"
 APP_DESTINATION="${TARGET_VOLUME%/}/Applications/Remote Mic.app"
 APP_PLIST="$APP_DESTINATION/Contents/Info.plist"
+HCI_SERVICE_LABEL="com.hd838a.SayAll.AppleRemoteHCIService"
+HCI_SERVICE_DESTINATION="${TARGET_VOLUME%/}/Library/PrivilegedHelperTools/$HCI_SERVICE_LABEL"
 LEGACY_APP_DESTINATION="${TARGET_VOLUME%/}/Applications/无线麦.app"
 LEGACY_APP_PLIST="$LEGACY_APP_DESTINATION/Contents/Info.plist"
 
@@ -88,5 +90,14 @@ if [[ -e "$LEGACY_APP_DESTINATION" || -L "$LEGACY_APP_DESTINATION" ]]; then
     installer_message \
       "旧中文应用路径不属于 Remote Mic，安装器将保留它不作处理。" \
       "The legacy Chinese app path does not belong to Remote Mic and will be left untouched."
+  fi
+fi
+
+if [[ "$TARGET_VOLUME" == "/" ]]; then
+  /bin/launchctl bootout "system/$HCI_SERVICE_LABEL" >/dev/null 2>&1 || true
+  if [[ -x "$HCI_SERVICE_DESTINATION" ]] && \
+     [[ "$(/usr/bin/codesign -dvv "$HCI_SERVICE_DESTINATION" 2>&1 | \
+       /usr/bin/sed -n 's/^Identifier=//p')" == "$HCI_SERVICE_LABEL" ]]; then
+    "$HCI_SERVICE_DESTINATION" --restore >/dev/null 2>&1 || true
   fi
 fi

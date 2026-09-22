@@ -4,6 +4,9 @@ set -euo pipefail
 TARGET_VOLUME="${3:-/}"
 DESTINATION="${TARGET_VOLUME%/}/Library/Audio/Plug-Ins/HAL/MiRemoteV2ch.driver"
 PLIST="$DESTINATION/Contents/Info.plist"
+HCI_SERVICE_LABEL="com.hd838a.SayAll.AppleRemoteHCIService"
+HCI_SERVICE_DESTINATION="${TARGET_VOLUME%/}/Library/PrivilegedHelperTools/$HCI_SERVICE_LABEL"
+HCI_SERVICE_PLIST="${TARGET_VOLUME%/}/Library/LaunchDaemons/$HCI_SERVICE_LABEL.plist"
 
 uses_chinese_locale() {
   local locale="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
@@ -18,10 +21,31 @@ installer_message() {
   fi
 }
 
-if [[ ! -e "$DESTINATION" ]]; then
+DRIVER_PRESENT=0
+if [[ -e "$DESTINATION" ]]; then
+  DRIVER_PRESENT=1
+fi
+
+if [[ "$TARGET_VOLUME" == "/" ]]; then
+  /bin/launchctl bootout "system/$HCI_SERVICE_LABEL" >/dev/null 2>&1 || true
+fi
+if [[ -x "$HCI_SERVICE_DESTINATION" ]] && \
+   [[ "$(/usr/bin/codesign -dvv "$HCI_SERVICE_DESTINATION" 2>&1 | \
+     /usr/bin/sed -n 's/^Identifier=//p')" == "$HCI_SERVICE_LABEL" ]]; then
+  if [[ "$TARGET_VOLUME" == "/" ]]; then
+    "$HCI_SERVICE_DESTINATION" --restore >/dev/null 2>&1 || true
+  fi
+  /bin/rm -f -- "$HCI_SERVICE_DESTINATION"
+fi
+if [[ -f "$HCI_SERVICE_PLIST" ]] && \
+   [[ "$(/usr/bin/plutil -extract Label raw -o - "$HCI_SERVICE_PLIST" 2>/dev/null || true)" == "$HCI_SERVICE_LABEL" ]]; then
+  /bin/rm -f -- "$HCI_SERVICE_PLIST"
+fi
+
+if [[ "$DRIVER_PRESENT" -eq 0 ]]; then
   installer_message \
-    "未发现 MiRemoteV 2ch，无需卸载。" \
-    "MiRemoteV 2ch was not found; nothing needs to be uninstalled."
+    "未发现 MiRemoteV 2ch；Apple Remote 系统服务已清理（如存在）。" \
+    "MiRemoteV 2ch was not found; the Apple Remote system service was cleaned up if present."
   exit 0
 fi
 

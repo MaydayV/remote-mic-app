@@ -15,6 +15,18 @@ final class AppLogger {
         logURL = base.appendingPathComponent("runtime.log")
     }
 
+    static func errorFields(_ error: Error) -> String {
+        let nsError = error as NSError
+        return errorFields(domain: nsError.domain, code: nsError.code)
+    }
+
+    static func errorFields(domain: String, code: Int) -> String {
+        let safeDomain = domain
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: "=", with: "_")
+        return "error_domain=\(safeDomain) error_code=\(code)"
+    }
+
     func write(_ message: String) {
         let line = "\(formatter.string(from: Date())) \(message)\n"
         queue.async { [logURL] in

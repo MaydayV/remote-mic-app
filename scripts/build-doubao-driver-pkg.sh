@@ -6,6 +6,8 @@ source "$ROOT/scripts/release-variant.sh"
 OUTPUT_DIR="$RELEASE_OUTPUT_DIR"
 DRIVER="$OUTPUT_DIR/MiRemoteV2ch.driver"
 APP="$OUTPUT_DIR/Remote Mic.app"
+APPLE_REMOTE_HCI_SERVICE="$APP/Contents/Helpers/SayAllAppleRemoteHCIService"
+APPLE_REMOTE_HCI_PLIST="$ROOT/packaging/apple-remote-hci/com.hd838a.SayAll.AppleRemoteHCIService.plist"
 VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$ROOT/Resources/Info.plist")"
 INSTALL_PACKAGE="$OUTPUT_DIR/$RELEASE_INSTALL_PACKAGE_NAME"
 LEGACY_INSTALL_PACKAGE="$OUTPUT_DIR/安装豆包兼容麦克风.pkg"
@@ -50,6 +52,9 @@ if [[ -n "$INSTALLER_SIGNING_KEYCHAIN" ]]; then
 fi
 "$ROOT/scripts/verify-doubao-driver.sh" "$DRIVER"
 "$ROOT/scripts/verify-app.sh" "$APP"
+test -x "$APPLE_REMOTE_HCI_SERVICE"
+test -f "$APPLE_REMOTE_HCI_PLIST"
+/usr/bin/plutil -lint "$APPLE_REMOTE_HCI_PLIST"
 
 /bin/rm -f -- \
   "$INSTALL_PACKAGE" \
@@ -58,12 +63,20 @@ fi
   "$LEGACY_UNINSTALL_PACKAGE"
 /bin/mkdir -p \
   "$PAYLOAD_ROOT/Applications" \
-  "$PAYLOAD_ROOT/Library/Application Support/RemoteMic/Installer"
+  "$PAYLOAD_ROOT/Library/Application Support/RemoteMic/Installer" \
+  "$PAYLOAD_ROOT/Library/LaunchDaemons" \
+  "$PAYLOAD_ROOT/Library/PrivilegedHelperTools"
 /usr/bin/ditto --norsrc --noextattr --noqtn --noacl \
   "$APP" "$PAYLOAD_ROOT/Applications/Remote Mic.app"
 /usr/bin/ditto --norsrc --noextattr --noqtn --noacl \
   "$DRIVER" \
   "$PAYLOAD_ROOT/Library/Application Support/RemoteMic/Installer/MiRemoteV2ch.driver"
+/usr/bin/ditto --norsrc --noextattr --noqtn --noacl \
+  "$APPLE_REMOTE_HCI_SERVICE" \
+  "$PAYLOAD_ROOT/Library/PrivilegedHelperTools/com.hd838a.SayAll.AppleRemoteHCIService"
+/usr/bin/ditto --norsrc --noextattr --noqtn --noacl \
+  "$APPLE_REMOTE_HCI_PLIST" \
+  "$PAYLOAD_ROOT/Library/LaunchDaemons/com.hd838a.SayAll.AppleRemoteHCIService.plist"
 /usr/bin/ditto --norsrc --noextattr --noqtn --noacl \
   "$ROOT/packaging/doubao-driver/install" "$INSTALL_SCRIPTS"
 /usr/bin/ditto --norsrc --noextattr --noqtn --noacl \

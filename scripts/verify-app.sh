@@ -10,6 +10,8 @@ fi
 APP="${1:-$RELEASE_OUTPUT_DIR/Remote Mic.app}"
 PLIST="$APP/Contents/Info.plist"
 BINARY="$APP/Contents/MacOS/RemoteMic"
+APPLE_REMOTE_AUDIO_HELPER="$APP/Contents/Helpers/SayAllAppleRemoteAudioCapture"
+APPLE_REMOTE_HCI_SERVICE="$APP/Contents/Helpers/SayAllAppleRemoteHCIService"
 SPARKLE_FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
 EXPECTED_DEVELOPER_TEAM_ID="${EXPECTED_DEVELOPER_TEAM_ID:-}"
 REQUIRE_DEVELOPER_ID_SIGNING="${REQUIRE_DEVELOPER_ID_SIGNING:-0}"
@@ -35,6 +37,10 @@ fi
 test -d "$APP"
 test -f "$PLIST"
 test -x "$BINARY"
+test -x "$APPLE_REMOTE_AUDIO_HELPER"
+test -x "$APPLE_REMOTE_HCI_SERVICE"
+test "$(codesign -dvv "$APPLE_REMOTE_HCI_SERVICE" 2>&1 | sed -n 's/^Identifier=//p')" = \
+  "com.hd838a.SayAll.AppleRemoteHCIService"
 test -d "$SPARKLE_FRAMEWORK"
 test -x "$SPARKLE_FRAMEWORK/Versions/B/Sparkle"
 test -x "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
@@ -140,6 +146,8 @@ test "$(plutil -extract SUAutomaticallyUpdate raw -o - "$PLIST")" = "false"
 test "$(plutil -extract SUAllowsAutomaticUpdates raw -o - "$PLIST")" = "false"
 test -n "$(plutil -extract SUPublicEDKey raw -o - "$PLIST")"
 codesign --verify --deep --strict "$APP"
+codesign --verify --strict "$APPLE_REMOTE_AUDIO_HELPER"
+codesign --verify --strict "$APPLE_REMOTE_HCI_SERVICE"
 if [[ "$REQUIRE_DEVELOPER_ID_SIGNING" == "1" ]]; then
   SIGNATURE_DETAILS="$(codesign -dvvv "$APP" 2>&1)"
   print -r -- "$SIGNATURE_DETAILS" | rg -q '^Authority=Developer ID Application:'
@@ -176,7 +184,7 @@ if [[ "$RELEASE_VARIANT" == "intel" ]]; then
   done
 fi
 
-EXPECTED_APP_FILES=$'Contents/Info.plist\nContents/MacOS/RemoteMic\nContents/Resources/AppIcon.icns\nContents/Resources/COPYRIGHT.md\nContents/Resources/FirstInstallGuide.md\nContents/Resources/LICENSE.md\nContents/Resources/LOGO-LICENSE.md\nContents/Resources/RC003-remote-photo.png\nContents/Resources/README.md\nContents/Resources/StatusIconActiveTemplate.png\nContents/Resources/StatusIconActiveTemplate@2x.png\nContents/Resources/StatusIconTemplate.png\nContents/Resources/StatusIconTemplate@2x.png\nContents/Resources/TECHNICAL.md\nContents/Resources/THIRD_PARTY_NOTICES.md\nContents/Resources/TROUBLESHOOTING.md\nContents/_CodeSignature/CodeResources'
+EXPECTED_APP_FILES=$'Contents/Info.plist\nContents/Helpers/SayAllAppleRemoteAudioCapture\nContents/Helpers/SayAllAppleRemoteHCIService\nContents/MacOS/RemoteMic\nContents/Resources/AppIcon.icns\nContents/Resources/COPYRIGHT.md\nContents/Resources/FirstInstallGuide.md\nContents/Resources/LICENSE.md\nContents/Resources/LOGO-LICENSE.md\nContents/Resources/RC003-remote-photo.png\nContents/Resources/README.md\nContents/Resources/StatusIconActiveTemplate.png\nContents/Resources/StatusIconActiveTemplate@2x.png\nContents/Resources/StatusIconTemplate.png\nContents/Resources/StatusIconTemplate@2x.png\nContents/Resources/TECHNICAL.md\nContents/Resources/THIRD_PARTY_NOTICES.md\nContents/Resources/TROUBLESHOOTING.md\nContents/_CodeSignature/CodeResources'
 while IFS= read -r expected_file; do
   test -f "$APP/$expected_file"
 done <<< "$EXPECTED_APP_FILES"

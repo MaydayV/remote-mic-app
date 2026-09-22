@@ -513,20 +513,24 @@ struct SettingsView: View {
     private var siriRemoteNativeMicSetupCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: model.isSiriRemoteNativeMicConfigured
+                Image(systemName: (model.isSiriRemoteUpstreamAudioReady ||
+                                   model.isSiriRemoteNativeMicConfigured)
                       ? "checkmark.circle.fill"
                       : "waveform.badge.mic")
-                    .foregroundStyle(model.isSiriRemoteNativeMicConfigured ? .green : .orange)
+                    .foregroundStyle((model.isSiriRemoteUpstreamAudioReady ||
+                                      model.isSiriRemoteNativeMicConfigured) ? .green : .orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("remote.backend.siri_native_setup_title")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(model.isSiriRemoteNativeMicConfigured
+                    Text(model.isSiriRemoteUpstreamAudioReady
+                        ? "remote.backend.siri_upstream_ready"
+                        : (model.isSiriRemoteNativeMicConfigured
                         ? (model.isSiriRemoteNativeMicCaptureRunning
                             ? "remote.backend.siri_native_capture_running"
                             : (model.isSiriRemoteBuiltinMicFallbackRunning
                                ? "remote.backend.siri_builtin_fallback_running"
                                : "remote.backend.siri_native_setup_enabled"))
-                         : "remote.backend.siri_native_setup_disabled")
+                         : "remote.backend.siri_native_setup_disabled"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -559,7 +563,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if !model.isSiriRemotePacketLoggerAvailable {
+            if !model.isSiriRemotePacketLoggerAvailable && !model.isSiriRemoteUpstreamAudioReady {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)

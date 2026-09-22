@@ -7,9 +7,12 @@ var packageDependencies: [Package.Dependency] = [
 ]
 var remoteMicDependencies: [Target.Dependency] = [
     "AudioExceptionGuard",
+    "AppleRemoteAudioCore",
+    "AppleRemotePacketLogger",
+    "AppleRemoteHCIProtocol",
     .product(name: "Sparkle", package: "Sparkle"),
 ]
-var remoteMicTestDependencies: [Target.Dependency] = ["RemoteMic"]
+var remoteMicTestDependencies: [Target.Dependency] = ["RemoteMic", "AppleRemoteHCIProtocol"]
 let macOSPlatform: SupportedPlatform = ProcessInfo.processInfo.environment["RELEASE_VARIANT"] == "intel"
     ? .macOS(.v13)
     : .macOS(.v14)
@@ -40,12 +43,52 @@ let package = Package(
         .executableTarget(
             name: "RemoteMic",
             dependencies: remoteMicDependencies,
-            path: "Sources/RemoteMic"
+            path: "Sources/RemoteMic",
+            linkerSettings: [
+                .linkedFramework("Network"),
+            ]
         ),
         .target(
             name: "AudioExceptionGuard",
             path: "Sources/AudioExceptionGuard",
             publicHeadersPath: "include"
+        ),
+        .target(
+            name: "AppleRemoteAudioCore",
+            path: "Sources/AppleRemoteAudioCore"
+        ),
+        .target(
+            name: "AppleRemoteHCIProtocol",
+            path: "Sources/AppleRemoteHCIProtocol"
+        ),
+        .target(
+            name: "AppleRemotePacketLogger",
+            dependencies: ["AppleRemoteAudioCore", "AppleRemoteHCIProtocol"],
+            path: "Sources/AppleRemoteAudioCapture",
+            exclude: ["AppleRemoteVoiceController.swift", "main.swift"],
+            sources: ["SayAllBTPacketLoggerClient.swift"],
+            linkerSettings: [
+                .linkedFramework("Security"),
+            ]
+        ),
+        .executableTarget(
+            name: "AppleRemoteAudioCapture",
+            dependencies: ["AppleRemoteAudioCore", "AppleRemotePacketLogger"],
+            path: "Sources/AppleRemoteAudioCapture",
+            exclude: ["SayAllBTPacketLoggerClient.swift"],
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("Network"),
+                .linkedFramework("Security"),
+            ]
+        ),
+        .executableTarget(
+            name: "AppleRemoteHCIService",
+            dependencies: ["AppleRemoteHCIProtocol"],
+            path: "Sources/AppleRemoteHCIService",
+            linkerSettings: [
+                .linkedFramework("Security"),
+            ]
         ),
         .testTarget(
             name: "RemoteMicTests",
