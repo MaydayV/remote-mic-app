@@ -17,16 +17,28 @@ struct BluetoothLifecycleTests {
 
     @Test func wakeRecoveryOnlyReconnectsAfterAStartedSystemWake() {
         #expect(BluetoothWakeRecoveryPolicy.shouldForceReconnect(
-            event: .systemDidWake,
-            started: true
+            pendingRecovery: BluetoothWakeRecoveryPolicy.pendingRecovery(
+                after: .systemDidWake,
+                current: false
+            ),
+            started: true,
+            readyBridgeCount: 0
         ))
         #expect(!BluetoothWakeRecoveryPolicy.shouldForceReconnect(
-            event: .systemDidWake,
-            started: false
+            pendingRecovery: BluetoothWakeRecoveryPolicy.pendingRecovery(
+                after: .systemDidWake,
+                current: false
+            ),
+            started: false,
+            readyBridgeCount: 0
         ))
         #expect(!BluetoothWakeRecoveryPolicy.shouldForceReconnect(
-            event: .screenDidWake,
-            started: true
+            pendingRecovery: BluetoothWakeRecoveryPolicy.pendingRecovery(
+                after: .screenDidWake,
+                current: false
+            ),
+            started: true,
+            readyBridgeCount: 0
         ))
     }
 

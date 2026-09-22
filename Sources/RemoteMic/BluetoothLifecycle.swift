@@ -135,11 +135,27 @@ enum BluetoothCentralRecoveryEvent {
 }
 
 enum BluetoothWakeRecoveryPolicy {
-    static func shouldForceReconnect(
-        event: SystemAudioLifecycleEvent,
-        started: Bool
+    /// Keep the intent across the wake notification: macOS can deliver the
+    /// wake while the display is still asleep, so the first resume callback may
+    /// be deferred until a later lifecycle event.
+    static func pendingRecovery(
+        after event: SystemAudioLifecycleEvent,
+        current: Bool
     ) -> Bool {
-        started && event == .systemDidWake
+        switch event {
+        case .systemWillSleep, .systemDidWake:
+            return true
+        case .screenDidSleep, .screenDidWake, .sessionDidResignActive, .sessionDidBecomeActive:
+            return current
+        }
+    }
+
+    static func shouldForceReconnect(
+        pendingRecovery: Bool,
+        started: Bool,
+        readyBridgeCount: Int
+    ) -> Bool {
+        started && pendingRecovery && readyBridgeCount == 0
     }
 }
 

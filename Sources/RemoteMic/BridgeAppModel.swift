@@ -224,6 +224,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
     static let onDemandVirtualAudioReleaseDelay: TimeInterval = 2.0
     private var systemAudioSuspensionState = SystemAudioSuspensionState()
     private var managedDefaultInputTransition: ManagedDefaultInputTransition?
+    private var bluetoothWakeRecoveryPending = false
     private lazy var audioHardwareListener: AudioObjectPropertyListenerBlock = { [weak self] count, addresses in
         let properties = Self.audioHardwarePropertyNames(count: count, addresses: addresses)
         self?.scheduleAudioRecovery(reason: "hardware_change", details: "properties=\(properties)")
@@ -309,6 +310,7 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         guard !started else { return }
         started = true
         systemRemoteRuntimeState.reset()
+        bluetoothWakeRecoveryPending = false
         configureSiriRemoteBackend()
         if RemoteBackendRuntimePolicy.shouldRunSiriRemote(activeKind: activeBackendKind) {
             MainActor.assumeIsolated {
@@ -2334,6 +2336,10 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
                 "bluetooth_voice=\(bluetoothVoiceActive) " +
                 "test_tone=\(isPlayingTestTone) audio_ready=\(isAudioOutputReady)"
         )
+        bluetoothWakeRecoveryPending = BluetoothWakeRecoveryPolicy.pendingRecovery(
+            after: event,
+            current: bluetoothWakeRecoveryPending
+        )
         guard started, changed else { return }
         guard !audioStartupPending else {
             AppLogger.shared.write(
@@ -2365,8 +2371,19 @@ final class BridgeAppModel: ObservableObject, XiaomiBluetoothBridgeDelegate {
         }
         resumeVirtualAudioOutputIfNeeded(reason: "system_\(event.rawValue)")
         if !remoteWakeManaged,
-           BluetoothWakeRecoveryPolicy.shouldForceReconnect(event: event, started: started) {
+           BluetoothWakeRecoveryPolicy.shouldForceReconnect(
+               pendingRecovery: bluetoothWakeRecoveryPending,
+               started: started,
+               readyBridgeCount: readyBluetoothBridgeCount
+           ) {
+            bluetoothWakeRecoveryPending = false
             recoverBluetoothAfterSystemWake()
+        } else if bluetoothWakeRecoveryPending, readyBluetoothBridgeCount > 0 {
+            bluetoothWakeRecoveryPending = false
+            AppLogger.shared.write(
+                "BLE WAKE recovery_skipped reason=bridges_already_ready " +
+                    "ready_bridges=\(readyBluetoothBridgeCount)"
+            )
         }
     }
 
