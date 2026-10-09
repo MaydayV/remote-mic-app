@@ -219,9 +219,12 @@ private final class HCIConfigurationStore {
             "identifier" as CFString: AppleRemoteHCIConstants.expectedClientIdentifier as CFString,
             "requirement" as CFString: requirement as CFString,
         ] as CFDictionary
+        let description = (Locale.preferredLanguages.first ?? "en").hasPrefix("zh")
+            ? "允许无线麦接收 Apple Remote 蓝牙音频。"
+            : "Allow SayAll to receive Bluetooth audio from your Apple Remote."
         try writeAuthorizationRight(
             definition,
-            description: "允许无线麦接收 Apple Remote 蓝牙音频。" as CFString
+            description: description as CFString
         )
     }
 
@@ -543,4 +546,3 @@ private let listener = NSXPCListener(
 listener.delegate = service
 listener.resume()
 RunLoop.main.run()
-

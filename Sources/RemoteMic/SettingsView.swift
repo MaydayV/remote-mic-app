@@ -1320,6 +1320,8 @@ struct SettingsView: View {
             .padding(.vertical, 8)
             .frame(width: fillsWidth ? nil : 232, alignment: .leading)
             .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
+            // Keep the whole card responsive, including its padding and background.
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .background(
                 selected ? Color.accentColor.opacity(0.13) : Color.primary.opacity(0.045),
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
