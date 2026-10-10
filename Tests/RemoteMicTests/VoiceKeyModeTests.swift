@@ -9,11 +9,40 @@ struct VoiceKeyModeTests {
         #expect(VoiceKeyMode.function.keyCode == 63)
         #expect(VoiceKeyMode.leftCommand.keyCode == 55)
         #expect(VoiceKeyMode.rightCommand.keyCode == 54)
+        #expect(VoiceKeyMode.leftOption.rawValue == "left_option")
+        #expect(VoiceKeyMode.leftOption.keyCode == 58)
         #expect(VoiceKeyMode.rightOption.rawValue == "right_option")
         #expect(VoiceKeyMode.rightOption.keyCode == 61)
         #expect(!VoiceKeyMode.function.requiresAccessibility)
         #expect(VoiceKeyMode.rightOption.requiresAccessibility)
         #expect(VoiceKeyMode.rightOption.localizationKey == "connection.voice_key.mode.right_option")
+    }
+
+    @Test func leftOptionInjectsAlternateModifierAndReleasesCleanly() {
+        var events: [(CGKeyCode, Bool, CGEventFlags)] = []
+        let poster: KeyboardInjector.KeyStatePoster = { code, isDown, flags in
+            events.append((code, isDown, flags))
+            return true
+        }
+        #expect(KeyboardInjector.setVoiceKeyPressed(
+            mode: .leftOption,
+            isPressed: true,
+            accessibilityTrusted: { true },
+            keyStatePoster: poster
+        ))
+        #expect(KeyboardInjector.setVoiceKeyPressed(
+            mode: .leftOption,
+            isPressed: false,
+            accessibilityTrusted: { true },
+            keyStatePoster: poster
+        ))
+        #expect(events.count == 2)
+        #expect(events[0].0 == 58)
+        #expect(events[0].1)
+        #expect(events[0].2 == .maskAlternate)
+        #expect(events[1].0 == 58)
+        #expect(!events[1].1)
+        #expect(events[1].2.isEmpty)
     }
 
     @Test func rightOptionInjectsAlternateModifierAndReleasesCleanly() {

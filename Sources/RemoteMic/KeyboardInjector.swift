@@ -188,7 +188,7 @@ enum KeyboardInjector {
             flags = isPressed ? .maskSecondaryFn : []
         case .leftCommand, .rightCommand:
             flags = isPressed ? .maskCommand : []
-        case .rightOption:
+        case .leftOption, .rightOption:
             flags = isPressed ? .maskAlternate : []
         }
         return keyStatePoster(CGKeyCode(mode.keyCode), isPressed, flags)

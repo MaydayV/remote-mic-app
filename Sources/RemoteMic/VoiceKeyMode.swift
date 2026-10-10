@@ -1,12 +1,13 @@
 import Foundation
 
 /// Key emitted while a voice session is active. Fn remains the default for
-/// backwards compatibility; Command modes provide a dedicated trigger for
+/// backwards compatibility; Command and Option modes provide a dedicated trigger for
 /// input methods that do not support Fn.
 enum VoiceKeyMode: String, Codable, CaseIterable, Identifiable {
     case function = "fn"
     case leftCommand = "left_command"
     case rightCommand = "right_command"
+    case leftOption = "left_option"
     case rightOption = "right_option"
 
     var id: String { rawValue }
@@ -16,6 +17,7 @@ enum VoiceKeyMode: String, Codable, CaseIterable, Identifiable {
         case .function: return 63
         case .leftCommand: return 55
         case .rightCommand: return 54
+        case .leftOption: return 58
         case .rightOption: return 61
         }
     }
